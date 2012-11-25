@@ -1,37 +1,30 @@
+
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.martiansoftware</groupId>
-  <artifactId>nailgun-examples</artifactId>
-  <version>0.9.1-SNAPSHOT</version>
-  <packaging>jar</packaging>
+    <groupId>com.martiansoftware</groupId>
+    <artifactId>nailgun-examples</artifactId>
+    <version>0.9.1</version>
+    <packaging>jar</packaging>
 
-  <name>nailgun-examples</name>
-  <url>http://maven.apache.org</url>
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>2.3.2</version>
-                <configuration>
-                    <source>1.4</source>
-                    <target>1.4</target>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
-    <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-  </properties>
-
-  <dependencies>
-    <dependency>
-      <groupId>com.martiansoftware</groupId>
-      <artifactId>nailgun-server</artifactId>
-      <version>0.9.1-SNAPSHOT</version>
-      <scope>compile</scope>
-    </dependency>
-  </dependencies>
+    <name>nailgun-examples</name>
+    <description>
+        Nailgun is a client, protocol, and server for running Java programs from 
+        the command line without incurring the JVM startup overhead. Programs run 
+        in the server (which is implemented in Java), and are triggered by the 
+        client (written in C), which handles all I/O.
+        
+        This project contains the EXAMPLE CODE ONLY.
+    </description>
+    <url>http://martiansoftware.com/nailgun</url>
+  
+    <dependencies>
+        <dependency>
+            <groupId>com.martiansoftware</groupId>
+            <artifactId>nailgun-server</artifactId>
+            <version>0.9.1</version>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
 </project>
