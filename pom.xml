@@ -1,0 +1,28 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.martiansoftware</groupId>
+    <artifactId>nailgun-all</artifactId>
+    <version>0.9.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    
+	<scm>
+		<url>http://github.com/martylamb/nailgun</url>
+		<connection>scm:git:git://github.com/martylamb/nailgun.git</connection>
+		<developerConnection>scm:git:git://github.com/martylamb/nailgun.git</developerConnection>
+	</scm>
+
+	<developers>
+		<developer>
+			<email>mlamb@martiansoftware.com</email>
+			<name>Marty Lamb</name>
+			<url>http://martiansoftware.com</url>
+		</developer>
+	</developers>
+	
+    <modules>
+		<module>nailgun-server</module>
+		<module>nailgun-examples</module>
+    </modules>
+</project>
