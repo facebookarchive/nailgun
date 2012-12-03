@@ -20,7 +20,7 @@
     <parent>
         <groupId>com.martiansoftware</groupId>
         <artifactId>nailgun-all</artifactId>
-        <version>0.9.1</version>
+        <version>0.9.1-SNAPSHOT</version>
     </parent>
 
     <build>
