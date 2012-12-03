@@ -37,8 +37,8 @@
     </licenses>    
 
     <scm>
-        <url>git@github.com:martylamb/nailgun.git</url>
-        <connection>scm:git:git://github.com/martylamb/nailgun.git</connection>
+        <url>scm:git:git@github.com:martylamb/nailgun.git</url>
+        <connection>scm:git:git@github.com:martylamb/nailgun.git</connection>
         <developerConnection>scm:git:git@github.com:martylamb/nailgun.git</developerConnection>
       <tag>nailgun-all-0.9.1</tag>
   </scm>
