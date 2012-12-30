@@ -68,7 +68,9 @@ public class NailStats implements Cloneable {
 	 * @return the number of times this nail has been run.
 	 */
 	public long getRunCount() {
-		return (runCounter);
+		synchronized (lock) {
+			return (runCounter);	
+		}
 	}
 	
 	/**
@@ -76,7 +78,9 @@ public class NailStats implements Cloneable {
 	 * @return the number of sessions currently running this nail. 
 	 */
 	public long getRefCount() {
-		return (refCounter);
+		synchronized (lock) {
+			return (refCounter);
+		}
 	}
 	
 	/**
