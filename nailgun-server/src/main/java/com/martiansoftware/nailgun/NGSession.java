@@ -34,7 +34,7 @@ import java.util.Properties;
  *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
-class NGSession extends Thread {
+public class NGSession extends Thread {
 
     /**
      * The server this NGSession is working for
@@ -80,6 +80,11 @@ class NGSession extends Thread {
      */
     private static Class[] nailMainSignature;
 
+    /**
+     * A ClassLoader that may be set by a client. Defaults to the classloader of this class.
+     */
+    public static volatile ClassLoader classLoader = null; // initialized in the static initializer - see below
+
     static {
         // initialize the signatures
         mainSignature = new Class[1];
@@ -87,6 +92,13 @@ class NGSession extends Thread {
 
         nailMainSignature = new Class[1];
         nailMainSignature[0] = NGContext.class;
+        
+        try {
+            classLoader = NGSession.class.getClassLoader();
+        } catch (SecurityException e) {
+            throw e;
+        }
+        
     }
 
     /**
@@ -239,7 +251,7 @@ class NGSession extends Thread {
                     if (alias != null) {
                         cmdclass = alias.getAliasedClass();
                     } else if (server.allowsNailsByClassName()) {
-                        cmdclass = Class.forName(command);
+                        cmdclass = Class.forName(command, true, classLoader);
                     } else {
                         cmdclass = server.getDefaultNailClass();
                     }
