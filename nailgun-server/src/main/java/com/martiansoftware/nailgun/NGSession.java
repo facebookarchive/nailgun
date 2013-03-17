@@ -248,38 +248,65 @@ class NGSession extends Thread {
                     Method mainMethod = null; // will be either main(String[]) or nailMain(NGContext)
                     String[] cmdlineArgs = (String[]) remoteArgs.toArray(new String[remoteArgs.size()]);
 
-                    try {
-                        mainMethod = cmdclass.getMethod("nailMain", nailMainSignature);
-                        NGContext context = new NGContext();
-                        context.setArgs(cmdlineArgs);
-                        context.in = in;
-                        context.out = out;
-                        context.err = err;
-                        context.setCommand(command);
-                        context.setExitStream(exit);
-                        context.setNGServer(server);
-                        context.setEnv(remoteEnv);
-                        context.setInetAddress(socket.getInetAddress());
-                        context.setPort(socket.getPort());
-                        context.setWorkingDirectory(cwd);
-                        methodArgs[0] = context;
-                    } catch (NoSuchMethodException toDiscard) {
-                        // that's ok - we'll just try main(String[]) next.
+                    boolean isStaticNail = true; // See: NonStaticNail.java
+
+                    Class[] interfaces = cmdclass.getInterfaces();
+                    
+                    for (int i = 0; i < interfaces.length; i++){
+                        if (interfaces[i].equals(NonStaticNail.class)){
+                            isStaticNail = false; break;
+                        }
                     }
 
-                    if (mainMethod == null) {
-                        mainMethod = cmdclass.getMethod("main", mainSignature);
+                    if (!isStaticNail){
+                        
+                        mainMethod = cmdclass.getMethod("nailMain", new Class[]{ String[].class });
                         methodArgs[0] = cmdlineArgs;
-                    }
+                        
+                    } else {
+                        
+                        try {
+                            mainMethod = cmdclass.getMethod("nailMain", nailMainSignature);
+                            NGContext context = new NGContext();
+                            context.setArgs(cmdlineArgs);
+                            context.in = in;
+                            context.out = out;
+                            context.err = err;
+                            context.setCommand(command);
+                            context.setExitStream(exit);
+                            context.setNGServer(server);
+                            context.setEnv(remoteEnv);
+                            context.setInetAddress(socket.getInetAddress());
+                            context.setPort(socket.getPort());
+                            context.setWorkingDirectory(cwd);
+                            methodArgs[0] = context;
+                        } catch (NoSuchMethodException toDiscard) {
+                            // that's ok - we'll just try main(String[]) next.
+                        }
 
+                        if (mainMethod == null) {
+                            mainMethod = cmdclass.getMethod("main", mainSignature);
+                            methodArgs[0] = cmdlineArgs;
+                        }
+        
+                    }
+                    
                     if (mainMethod != null) {
                         server.nailStarted(cmdclass);
                         NGSecurityManager.setExit(exit);
 
                         try {
-                            mainMethod.invoke(null, methodArgs);
+                            if (isStaticNail){
+                                mainMethod.invoke(null, methodArgs);
+                            } else {
+                                mainMethod.invoke(cmdclass.newInstance(), methodArgs);
+                            }
                         } catch (InvocationTargetException ite) {
                             throw (ite.getCause());
+                        } catch (InstantiationException e){
+                            throw (e);
+                        } catch (IllegalAccessException e){
+                            throw (e);  
                         } catch (Throwable t) {
                             throw (t);
                         } finally {
