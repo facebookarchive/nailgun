@@ -34,7 +34,7 @@ import java.util.Properties;
  *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
-class NGSession extends Thread {
+public class NGSession extends Thread {
 
     /**
      * The server this NGSession is working for
@@ -80,6 +80,11 @@ class NGSession extends Thread {
      */
     private static Class[] nailMainSignature;
 
+    /**
+     * A ClassLoader that may be set by a client. Defaults to the classloader of this class.
+     */
+    public static volatile ClassLoader classLoader = null; // initialized in the static initializer - see below
+
     static {
         // initialize the signatures
         mainSignature = new Class[1];
@@ -87,6 +92,13 @@ class NGSession extends Thread {
 
         nailMainSignature = new Class[1];
         nailMainSignature[0] = NGContext.class;
+        
+        try {
+            classLoader = NGSession.class.getClassLoader();
+        } catch (SecurityException e) {
+            throw e;
+        }
+        
     }
 
     /**
@@ -239,7 +251,7 @@ class NGSession extends Thread {
                     if (alias != null) {
                         cmdclass = alias.getAliasedClass();
                     } else if (server.allowsNailsByClassName()) {
-                        cmdclass = Class.forName(command);
+                        cmdclass = Class.forName(command, true, classLoader);
                     } else {
                         cmdclass = server.getDefaultNailClass();
                     }
@@ -248,38 +260,65 @@ class NGSession extends Thread {
                     Method mainMethod = null; // will be either main(String[]) or nailMain(NGContext)
                     String[] cmdlineArgs = (String[]) remoteArgs.toArray(new String[remoteArgs.size()]);
 
-                    try {
-                        mainMethod = cmdclass.getMethod("nailMain", nailMainSignature);
-                        NGContext context = new NGContext();
-                        context.setArgs(cmdlineArgs);
-                        context.in = in;
-                        context.out = out;
-                        context.err = err;
-                        context.setCommand(command);
-                        context.setExitStream(exit);
-                        context.setNGServer(server);
-                        context.setEnv(remoteEnv);
-                        context.setInetAddress(socket.getInetAddress());
-                        context.setPort(socket.getPort());
-                        context.setWorkingDirectory(cwd);
-                        methodArgs[0] = context;
-                    } catch (NoSuchMethodException toDiscard) {
-                        // that's ok - we'll just try main(String[]) next.
+                    boolean isStaticNail = true; // See: NonStaticNail.java
+
+                    Class[] interfaces = cmdclass.getInterfaces();
+                    
+                    for (int i = 0; i < interfaces.length; i++){
+                        if (interfaces[i].equals(NonStaticNail.class)){
+                            isStaticNail = false; break;
+                        }
                     }
 
-                    if (mainMethod == null) {
-                        mainMethod = cmdclass.getMethod("main", mainSignature);
+                    if (!isStaticNail){
+                        
+                        mainMethod = cmdclass.getMethod("nailMain", new Class[]{ String[].class });
                         methodArgs[0] = cmdlineArgs;
-                    }
+                        
+                    } else {
+                        
+                        try {
+                            mainMethod = cmdclass.getMethod("nailMain", nailMainSignature);
+                            NGContext context = new NGContext();
+                            context.setArgs(cmdlineArgs);
+                            context.in = in;
+                            context.out = out;
+                            context.err = err;
+                            context.setCommand(command);
+                            context.setExitStream(exit);
+                            context.setNGServer(server);
+                            context.setEnv(remoteEnv);
+                            context.setInetAddress(socket.getInetAddress());
+                            context.setPort(socket.getPort());
+                            context.setWorkingDirectory(cwd);
+                            methodArgs[0] = context;
+                        } catch (NoSuchMethodException toDiscard) {
+                            // that's ok - we'll just try main(String[]) next.
+                        }
 
+                        if (mainMethod == null) {
+                            mainMethod = cmdclass.getMethod("main", mainSignature);
+                            methodArgs[0] = cmdlineArgs;
+                        }
+        
+                    }
+                    
                     if (mainMethod != null) {
                         server.nailStarted(cmdclass);
                         NGSecurityManager.setExit(exit);
 
                         try {
-                            mainMethod.invoke(null, methodArgs);
+                            if (isStaticNail){
+                                mainMethod.invoke(null, methodArgs);
+                            } else {
+                                mainMethod.invoke(cmdclass.newInstance(), methodArgs);
+                            }
                         } catch (InvocationTargetException ite) {
                             throw (ite.getCause());
+                        } catch (InstantiationException e){
+                            throw (e);
+                        } catch (IllegalAccessException e){
+                            throw (e);  
                         } catch (Throwable t) {
                             throw (t);
                         } finally {
