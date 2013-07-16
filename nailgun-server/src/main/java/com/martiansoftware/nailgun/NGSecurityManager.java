@@ -71,4 +71,13 @@ public class NGSecurityManager extends SecurityManager {
         public static void setExit (PrintStream exit) {
                 EXIT.set(exit);
         }
+
+        /**
+         * Avoid constructing a FilePermission object in checkRead if base manager is null.
+         */
+        public void checkRead(String file) {
+                if (base != null) {
+                        super.checkRead(file);
+                }
+        }
 }
