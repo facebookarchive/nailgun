@@ -2,3 +2,5 @@
 /nailgun-examples/target/
 /target/
 ng
+*.iml
+.idea/

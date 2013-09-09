@@ -81,10 +81,21 @@ public class NGConstants {
      * client's inputstream is read.
      */
     public static final byte CHUNKTYPE_STARTINPUT = 'S';
+
+    /**
+     * Chunk type marker for heartbeats sent to let the server know the client is still alive.
+     */
+    public static final byte CHUNKTYPE_HEARTBEAT = 'H';
+
     /**
      * Server version number
      */
     public static final String VERSION;
+
+    /**
+     * Expected interval between heartbeats in milliseconds.
+     */
+    public static final short HEARTBEAT_INTERVAL_MILLIS = 100;
 
     /**
      * Returns the Nailgun version number

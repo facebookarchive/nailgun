@@ -333,6 +333,8 @@ public class NGSession extends Thread {
                 } catch (Throwable t) {
                     t.printStackTrace();
                     exit.println(NGConstants.EXIT_EXCEPTION); // remote exception constant
+                } finally {
+                    in.close();
                 }
 
                 sockout.flush();

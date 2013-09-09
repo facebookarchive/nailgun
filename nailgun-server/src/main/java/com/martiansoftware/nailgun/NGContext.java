@@ -258,4 +258,11 @@ public class NGContext {
 			throw (new SecurityException("Client is not local."));
 		}
 	}
+
+    /**
+     * @return true if client is running, false if a client exit has been detected.
+     */
+    public boolean isClientRunning() {
+        return ((NGInputStream) this.in).isClientRunning();
+    }
 }
