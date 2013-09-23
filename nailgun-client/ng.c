@@ -29,7 +29,7 @@
 	#include <netdb.h>
 	#include <netinet/in.h>
 	#include <sys/socket.h>
-        #include <sys/time.h>
+	#include <sys/time.h>
 	#include <sys/types.h>
 #endif
 
@@ -95,8 +95,10 @@
 #define CHUNKTYPE_DIR 'D'
 #define CHUNKTYPE_CMD 'C'
 #define CHUNKTYPE_EXIT 'X'
-#define CHUNKTYPE_STARTINPUT 'S'
+#define CHUNKTYPE_SENDINPUT 'S'
 #define CHUNKTYPE_HEARTBEAT 'H'
+
+#define HEARTBEAT_TIMEOUT_MILLIS 500
 
 /*
    the following is required to compile for hp-ux
@@ -113,7 +115,12 @@ int nailgunsocket = 0;
 char buf[BUFSIZE];
 
 /* track whether server is ready to receive */
-int readyToSend = 0;
+#ifdef WIN32
+    HANDLE readyToSend = 0;
+    HANDLE sending = 0;
+#else
+    int readyToSend = 0;
+#endif
 
 /**
  * Clean up the application.
@@ -178,6 +185,12 @@ int sendAll(SOCKET s, char *buf, int len) {
   int total = 0;      
   int bytesleft = len; 
   int n = 0;
+
+#ifdef WIN32
+  if (WaitForSingleObject(sending, INFINITE) != WAIT_OBJECT_0) {
+    handleError();
+  }
+#endif
     
   while(total < len) {
     n = send(s, buf+total, bytesleft, 0);
@@ -189,6 +202,10 @@ int sendAll(SOCKET s, char *buf, int len) {
     total += n;
     bytesleft -= n;
   }
+
+#ifdef WIN32
+  ReleaseMutex(sending);
+#endif
 
   return n==-1 ? 0:total; 
 }
@@ -280,9 +297,9 @@ void recvToFD(HANDLE destFD, char *buf, unsigned long len) {
     int thisPass = 0;
     
     thisPass = recv(nailgunsocket, buf, bytesToRead, MSG_WAITALL);
-    if (thisPass < bytesToRead) handleSocketClose();
-    
-   
+	if (thisPass == 0) {
+	  handleSocketClose();
+	}
     bytesRead += thisPass;
 
     bytesCopied = 0;
@@ -306,6 +323,17 @@ void recvToFD(HANDLE destFD, char *buf, unsigned long len) {
   }
 }
 
+unsigned long recvToBuffer(unsigned long len) {
+  unsigned long bytesRead = 0;
+  while(bytesRead < len) {
+    int thisPass = recv(nailgunsocket, buf + bytesRead, len - bytesRead, MSG_WAITALL);
+	if (thisPass == 0) {
+      handleSocketClose();
+	}
+	bytesRead += thisPass;
+  }
+  return bytesRead;
+}
 
 /**
  * Processes an exit chunk from the server.  This is just a string
@@ -317,7 +345,7 @@ void recvToFD(HANDLE destFD, char *buf, unsigned long len) {
 void processExit(char *buf, unsigned long len) {
   int exitcode;
   int bytesToRead = (BUFSIZE - 1 < len) ? BUFSIZE - 1 : len;
-  int bytesRead = recv(nailgunsocket, buf, bytesToRead, MSG_WAITALL);
+  int bytesRead = recvToBuffer(bytesToRead);
   
   if (bytesRead < 0) {
     handleSocketClose();
@@ -338,7 +366,9 @@ void processExit(char *buf, unsigned long len) {
  * @param len the number of bytes to send
  */
 void sendStdin(char *buf, unsigned int len) {
+#ifndef WIN32
   readyToSend = 0;
+#endif
   sendHeader(len, CHUNKTYPE_STDIN);
   sendAll(nailgunsocket, buf, len);
 }
@@ -358,6 +388,32 @@ void sendHeartbeat() {
 }
 
 #ifdef WIN32
+
+HANDLE createEvent(BOOL manualReset) {
+  return CreateEvent(NULL, /* default security */
+		     manualReset,
+		     FALSE, /* initial state unsignalled */
+		     NULL /* unnamed event */);
+}
+
+DWORD waitSendingHeartbeatsFor(HANDLE object) {
+  DWORD result = WaitForSingleObject(object, HEARTBEAT_TIMEOUT_MILLIS);
+  while(result == WAIT_TIMEOUT) {
+    sendHeartbeat();
+    result = WaitForSingleObject(object, HEARTBEAT_TIMEOUT_MILLIS);
+  }
+  return result;
+}
+
+DWORD WINAPI sendHeartbeats(LPVOID lpParameter) {
+		
+	/* this could be made more efficient by only sending heartbeats when stdin chunks aren't being sent */
+	for (;;) {
+		Sleep(HEARTBEAT_TIMEOUT_MILLIS);
+		sendHeartbeat();
+	}
+}
+
 /**
  * Thread main for reading from stdin and sending
  */
@@ -365,23 +421,32 @@ DWORD WINAPI processStdin (LPVOID lpParameter) {
   /* buffer used for reading and sending stdin chunks */
   char wbuf[BUFSIZE];
 
-  for (;;) {
-    DWORD numberOfBytes = 0;
+  /* number of bytes read */
+  DWORD numberOfBytes;
 
-    if (readyToSend && !ReadFile(NG_STDIN_FILENO, wbuf, BUFSIZE, &numberOfBytes, NULL)) {
-      if (numberOfBytes != 0) {
-        handleError();
-      }
+  for (;;) {
+
+    /* wait for ready to send */
+    if(WaitForSingleObject(readyToSend, INFINITE) != WAIT_OBJECT_0) {
+      handleError();
     }
 
+	/* read data from stdin */
+	if (! ReadFile(NG_STDIN_FILENO, wbuf, BUFSIZE, &numberOfBytes, NULL)) {
+		if (numberOfBytes != 0) {
+			handleError();
+		}
+	}
+
+    /* send data to server */
     if (numberOfBytes > 0) {
       sendStdin(wbuf, numberOfBytes);
     } else {
       processEof();
       break;
     }
-  }
 
+  }
   return 0;
 }
 #else
@@ -410,6 +475,10 @@ void initSockets () {
   WSADATA win_socket_data;     /* required to initialise winsock */
   
   WSAStartup(2, &win_socket_data);
+
+  /* create flow control event and mutex */
+  readyToSend = createEvent(FALSE);
+  sending = CreateMutex(NULL, FALSE, NULL);
 }
 #endif
 
@@ -442,6 +511,10 @@ void winStartInput () {
   if (!CreateThread(&securityAttributes, 0, &processStdin, NULL, 0, &threadId)) {
     handleError();
   }
+
+  if (!CreateThread(&securityAttributes, 0, &sendHeartbeats, NULL, 0, &threadId)) {
+    handleError();
+  }
 }
 #endif
 
@@ -451,16 +524,11 @@ void winStartInput () {
 void processnailgunstream() {
 
   /*for (;;) {*/
-    int bytesRead = 0;
     unsigned long len;
     char chunkType;
 
-    bytesRead = recv(nailgunsocket, buf, CHUNK_HEADER_LEN, MSG_WAITALL);
+    recvToBuffer(CHUNK_HEADER_LEN);
 
-    if (bytesRead < CHUNK_HEADER_LEN) {
-      handleSocketClose();
-    }
-  
     len = ((buf[0] << 24) & 0xff000000)
       | ((buf[1] << 16) & 0x00ff0000)
       | ((buf[2] << 8) & 0x0000ff00)
@@ -475,8 +543,12 @@ void processnailgunstream() {
             break;
       case CHUNKTYPE_EXIT:   processExit(buf, len);
             break;
-      case CHUNKTYPE_STARTINPUT:
-	    readyToSend = 1; // TODO(jimp): atomic integer on windows...
+      case CHUNKTYPE_SENDINPUT:
+#ifdef WIN32
+            SetEvent(readyToSend);
+#else
+            readyToSend = 1;
+#endif
             break;
       default:  fprintf(stderr, "Unexpected chunk type %d ('%c')\n", chunkType, chunkType);
           cleanUpAndExit(NAILGUN_UNEXPECTED_CHUNKTYPE);
@@ -558,7 +630,6 @@ int main(int argc, char *argv[], char *env[]) {
     fd_set readfds;
     int eof = 0;
     struct timeval readtimeout;
-
   #endif
 
   #ifdef WIN32
@@ -696,6 +767,7 @@ int main(int argc, char *argv[], char *env[]) {
   /* initialise the std-* handles and the thread to send stdin to the server */ 
   #ifdef WIN32
   initIo();
+  winStartInput();
   #endif
 
   /* stream forwarding loop */	
@@ -711,7 +783,7 @@ int main(int argc, char *argv[], char *env[]) {
       FD_SET(nailgunsocket, &readfds);
 
       memset(&readtimeout, '\0', sizeof(readtimeout));
-      readtimeout.tv_usec = 100000;
+      readtimeout.tv_usec = HEARTBEAT_TIMEOUT_MILLIS * 1000;
       if(select (nailgunsocket + 1, &readfds, NULL, NULL, &readtimeout) == -1) {
 	  perror("select");
       }

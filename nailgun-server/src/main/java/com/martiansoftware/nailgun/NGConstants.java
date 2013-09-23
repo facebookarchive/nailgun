@@ -80,7 +80,7 @@ public class NGConstants {
      * sending stdin to the server. It is automatically sent the first time the
      * client's inputstream is read.
      */
-    public static final byte CHUNKTYPE_STARTINPUT = 'S';
+    public static final byte CHUNKTYPE_SENDINPUT = 'S';
 
     /**
      * Chunk type marker for heartbeats sent to let the server know the client is still alive.
@@ -95,7 +95,12 @@ public class NGConstants {
     /**
      * Expected interval between heartbeats in milliseconds.
      */
-    public static final short HEARTBEAT_INTERVAL_MILLIS = 100;
+    public static final short HEARTBEAT_INTERVAL_MILLIS = 1000;
+
+    /**
+     * Maximum chunk len sent from client.
+     */
+    public static final short MAXIMUM_CHUNK_LENGTH = 2048;
 
     /**
      * Returns the Nailgun version number
