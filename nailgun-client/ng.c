@@ -185,12 +185,6 @@ int sendAll(SOCKET s, char *buf, int len) {
   int total = 0;      
   int bytesleft = len; 
   int n = 0;
-
-#ifdef WIN32
-  if (WaitForSingleObject(sending, INFINITE) != WAIT_OBJECT_0) {
-    handleError();
-  }
-#endif
     
   while(total < len) {
     n = send(s, buf+total, bytesleft, 0);
@@ -203,20 +197,17 @@ int sendAll(SOCKET s, char *buf, int len) {
     bytesleft -= n;
   }
 
-#ifdef WIN32
-  ReleaseMutex(sending);
-#endif
-
   return n==-1 ? 0:total; 
 }
 
 /**
- * Sends a chunk header noting the specified payload size and chunk type.
+ * Sends a chunk noting the specified payload size and chunk type.
+ * Waits for sending mutex on Win32.
  * 
  * @param size the payload size
  * @param chunkType the chunk type identifier
  */
-void sendHeader(unsigned int size, char chunkType) {
+void sendChunk(unsigned int size, char chunkType, char* buf) {
   /* buffer used for reading and writing chunk headers */
   char header[CHUNK_HEADER_LEN];
 
@@ -226,7 +217,20 @@ void sendHeader(unsigned int size, char chunkType) {
   header[3] = size & 0xff;
   header[4] = chunkType;
 
+#ifdef WIN32
+  if (WaitForSingleObject(sending, INFINITE) != WAIT_OBJECT_0) {
+    handleError();
+  }
+#endif
+
   sendAll(nailgunsocket, header, CHUNK_HEADER_LEN);
+  if (size > 0) {
+	  sendAll(nailgunsocket, buf, size);
+  }
+
+#ifdef WIN32
+  ReleaseMutex(sending);
+#endif
 }
 
 /**
@@ -247,15 +251,14 @@ int sendFileArg(char *filename) {
 
   i = read(f, buf, BUFSIZE);
   while (i > 0) {
-    sendHeader(i, CHUNKTYPE_LONGARG);
-    sendAll(nailgunsocket, buf, i);
+    sendChunk(i, CHUNKTYPE_LONGARG, buf);
     i = read(f, buf, BUFSIZE);
   }
   if (i < 0) {
     perror("--nailgun-filearg");
     return 1;
   }
-  sendHeader(0, CHUNKTYPE_LONGARG);
+  sendChunk(0, CHUNKTYPE_LONGARG, buf);
   
   close(f);
   return 0;
@@ -269,8 +272,7 @@ int sendFileArg(char *filename) {
  */
 void sendText(char chunkType, char *text) {
   int len = text ? strlen(text) : 0;
-  sendHeader(len, chunkType);
-  sendAll(nailgunsocket, text, len);
+  sendChunk(len, chunkType, text);
 }
 
 /**
@@ -369,22 +371,21 @@ void sendStdin(char *buf, unsigned int len) {
 #ifndef WIN32
   readyToSend = 0;
 #endif
-  sendHeader(len, CHUNKTYPE_STDIN);
-  sendAll(nailgunsocket, buf, len);
+  sendChunk(len, CHUNKTYPE_STDIN, buf);
 }
 
 /**
  * Sends a stdin-eof chunk to the nailgun server
  */
 void processEof() {
-  sendHeader(0, CHUNKTYPE_STDIN_EOF);
+  sendChunk(0, CHUNKTYPE_STDIN_EOF, buf);
 }
 
 /**
  * Sends a heartbeat chunk to let the server know the client is still alive.
  */
 void sendHeartbeat() {
-  sendHeader(0, CHUNKTYPE_HEARTBEAT);
+  sendChunk(0, CHUNKTYPE_HEARTBEAT, buf);
 }
 
 #ifdef WIN32
@@ -394,15 +395,6 @@ HANDLE createEvent(BOOL manualReset) {
 		     manualReset,
 		     FALSE, /* initial state unsignalled */
 		     NULL /* unnamed event */);
-}
-
-DWORD waitSendingHeartbeatsFor(HANDLE object) {
-  DWORD result = WaitForSingleObject(object, HEARTBEAT_TIMEOUT_MILLIS);
-  while(result == WAIT_TIMEOUT) {
-    sendHeartbeat();
-    result = WaitForSingleObject(object, HEARTBEAT_TIMEOUT_MILLIS);
-  }
-  return result;
 }
 
 DWORD WINAPI sendHeartbeats(LPVOID lpParameter) {

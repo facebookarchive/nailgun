@@ -67,14 +67,14 @@ public class NGInputStream extends FilterInputStream implements Closeable {
                         Future readHeaderFuture = executor.submit(new Runnable(){
                             public void run() {
                                 try {
-                                    readHeader();
+                                    readChunk();
                                 } catch (IOException e) {
                                     throw new RuntimeException(e);
                                 }
                             }
                         });
                         try {
-                            readHeaderFuture.get(NGConstants.HEARTBEAT_INTERVAL_MILLIS * 2, TimeUnit.MILLISECONDS);
+                            readHeaderFuture.get(NGConstants.HEARTBEAT_INTERVAL_MILLIS * 10, TimeUnit.MILLISECONDS);
                         } catch (TimeoutException e) {
                             if (! isClientConnected()) {
                                 break;
@@ -109,13 +109,35 @@ public class NGInputStream extends FilterInputStream implements Closeable {
 		readFuture.cancel(true);
 	}
 
+    /**
+     * Reads a NailGun chunk payload from {@link #in} and returns an InputStream that reads from
+     * that chunk.
+     * @param in the InputStream to read the chunk payload from.
+     * @param len the size of the payload chunk read from the chunkHeader.
+     * @return an InputStream containing the read data.
+     * @throws IOException if thrown by the underlying InputStream,
+     * or if the stream EOF is reached before the payload has been read.
+     */
+    private InputStream readPayload(InputStream in, int len) throws IOException {
+
+        int totalRead = 0;
+        while (totalRead < len) {
+            int currentRead = in.read(receiveBuffer, totalRead, len - totalRead);
+            if (currentRead < 0) {
+                throw new IOException("stdin EOF before payload read.");
+            }
+            totalRead += currentRead;
+        }
+        return new ByteArrayInputStream(receiveBuffer);
+    }
+
 	/**
 	 * Reads a NailGun chunk header from the underlying InputStream.
 	 * 
 	 * @throws IOException if thrown by the underlying InputStream,
 	 * or if an unexpected NailGun chunk type is encountered.
 	 */
-	private void readHeader() throws IOException {
+	private void readChunk() throws IOException {
 
         synchronized (din) {
             int hlen = din.readInt();
@@ -125,8 +147,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
                 case NGConstants.CHUNKTYPE_STDIN:
                     if (remaining != 0) throw new IOException("Data received before stdin stream was emptied.");
                     remaining = hlen;
-                    in.read(receiveBuffer, 0, hlen);
-                    stdin = new ByteArrayInputStream(receiveBuffer);
+                    stdin = readPayload(in, hlen);
                     break;
 
                 case NGConstants.CHUNKTYPE_STDIN_EOF:
@@ -181,7 +202,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
 			sendStartInput();
 		}
 
-        while ((! eof) && remaining == 0) readHeader();
+        while ((! eof) && remaining == 0) readChunk();
         if (eof) return(-1);
 		if (stdin == null) return 0;
 
