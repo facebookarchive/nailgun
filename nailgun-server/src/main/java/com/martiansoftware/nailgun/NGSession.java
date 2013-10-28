@@ -235,7 +235,7 @@ public class NGSession extends Thread {
                 // can't create NGInputStream until we've received a command, because at
                 // that point the stream from the client will only include stdin and stdin-eof
                 // chunks
-                InputStream in = new NGInputStream(sockin, sockout);
+                InputStream in = new NGInputStream(sockin, sockout, server.out);
                 PrintStream out = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDOUT));
                 PrintStream err = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDERR));
                 PrintStream exit = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_EXIT));

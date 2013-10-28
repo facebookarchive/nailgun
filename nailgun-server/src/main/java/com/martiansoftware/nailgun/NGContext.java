@@ -101,7 +101,7 @@ public class NGContext {
 	/**
 	 * Creates a new, empty NGContext
 	 */
-	NGContext() {
+	public NGContext() {
 		super();
 	}
 	
@@ -148,7 +148,7 @@ public class NGContext {
 		this.remoteHost = remoteHost;
 	}
 
-	void setArgs(String[] args) {
+	public void setArgs(String[] args) {
 		this.args = args;
 	}
 
@@ -260,9 +260,30 @@ public class NGContext {
 	}
 
     /**
-     * @return true if client is running, false if a client exit has been detected.
+     * @return the {@link NGInputStream} for this session.
      */
-    public boolean isClientRunning() {
-        return ((NGInputStream) this.in).isClientRunning();
+    private NGInputStream getInputStream() {
+        return (NGInputStream) this.in;
+    }
+
+    /**
+     * @return true if client is connected, false if a client exit has been detected.
+     */
+    public boolean isClientConnected() {
+        return getInputStream().isClientConnected();
+    }
+
+    /**
+     * @param listener the {@link NGClientListener} to be notified of client events.
+     */
+    public void addClientListener(NGClientListener listener) {
+        getInputStream().addClientListener(listener);
+    }
+
+    /**
+     * @param listener the {@link NGClientListener} to no longer be notified of client events.
+     */
+    public void removeClientListener(NGClientListener listener) {
+        getInputStream().removeClientListener(listener);
     }
 }
