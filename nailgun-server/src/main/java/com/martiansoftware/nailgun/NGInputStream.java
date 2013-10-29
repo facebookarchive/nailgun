@@ -101,6 +101,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
             for (Iterator i = clientListeners.iterator(); i.hasNext();) {
                 ((NGClientListener) i.next()).clientDisconnected();
             }
+            serverLog.println(mainThread.getName() + " disconnected");
         }
         catch (NGExitException e) {
             serverLog.println(mainThread.getName() + " exited with status " + e.getStatus());
