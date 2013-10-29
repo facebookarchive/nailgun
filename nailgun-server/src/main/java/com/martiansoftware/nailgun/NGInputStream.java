@@ -32,7 +32,10 @@ import java.util.concurrent.*;
  */
 public class NGInputStream extends FilterInputStream implements Closeable {
 
-    private static final ExecutorService executor = Executors.newCachedThreadPool();
+    // An NGInputStream is required per NGSession and each NGInputStream requires one thread to loop reading chunks
+    // by executing Runnables on another thread with a timeout. So, the thread pool size needs to be twice the
+    // DEFAULT_SESSIONPOOL size.
+    private static final ExecutorService executor = Executors.newFixedThreadPool(NGServer.DEFAULT_SESSIONPOOLSIZE * 2);
     private final DataInputStream din;
     private InputStream stdin = null;
     private boolean eof = false;
@@ -61,13 +64,17 @@ public class NGInputStream extends FilterInputStream implements Closeable {
         readFuture = executor.submit(new Runnable(){
             public void run() {
                 try {
+                    Thread.currentThread().setName(mainThread.getName() + " read stream thread (NGInputStream pool)");
                     while(true) {
                         Future readHeaderFuture = executor.submit(new Runnable(){
                             public void run() {
+                                Thread.currentThread().setName(mainThread.getName() + " read chunk thread (NGInputStream pool)");
                                 try {
                                     readChunk();
                                 } catch (IOException e) {
                                     throw new RuntimeException(e);
+                                } finally {
+                                    Thread.currentThread().setName(Thread.currentThread().getName() + " (idle)");
                                 }
                             }
                         });
@@ -82,7 +89,9 @@ public class NGInputStream extends FilterInputStream implements Closeable {
                 } catch (InterruptedException e) {
                 } catch (ExecutionException e) {
                 } finally {
+                    readEof();
                     notifyClientListeners(serverLog, mainThread);
+                    Thread.currentThread().setName(Thread.currentThread().getName() + " (idle)");
                 }
             }
         });
@@ -162,8 +171,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
                 break;
 
             case NGConstants.CHUNKTYPE_STDIN_EOF:
-                eof = true;
-                notify();
+                readEof();
                 break;
 
             case NGConstants.CHUNKTYPE_HEARTBEAT:
@@ -174,7 +182,15 @@ public class NGInputStream extends FilterInputStream implements Closeable {
         }
     }
 
-	/**
+    /**
+     * Notify threads waiting in waitForChunk on either EOF chunk read or client disconnection.
+     */
+    private synchronized void readEof() {
+        eof = true;
+        notifyAll();
+    }
+
+    /**
 	 * @see java.io.InputStream#available()
 	 */
 	public int available() throws IOException {
@@ -224,7 +240,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
 	}
 
     /**
-     * If EOF chunk has not been received, but no data is available, block until data is received.
+     * If EOF chunk has not been received, but no data is available, block until data is received, EOF or disconnection.
      * @throws IOException which just wraps InterruptedExceptions thrown by wait.
      */
     private synchronized void waitForChunk() throws IOException {
