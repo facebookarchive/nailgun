@@ -32,7 +32,10 @@ import java.util.concurrent.*;
  */
 public class NGInputStream extends FilterInputStream implements Closeable {
 
-    private static final ExecutorService executor = Executors.newCachedThreadPool();
+    // An NGInputStream is required per NGSession and each NGInputStream requires one thread to loop reading chunks
+    // by executing Runnables on another thread with a timeout. So, the thread pool size needs to be twice the
+    // DEFAULT_SESSIONPOOL size.
+    private static final ExecutorService executor = Executors.newFixedThreadPool(NGServer.DEFAULT_SESSIONPOOLSIZE * 2);
     private final DataInputStream din;
     private InputStream stdin = null;
     private boolean eof = false;
@@ -42,7 +45,6 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     private boolean started = false;
     private long lastReadTime = System.currentTimeMillis();
     private final Future readFuture;
-    private final byte[] receiveBuffer = new byte[NGConstants.MAXIMUM_CHUNK_LENGTH];
     private final Set clientListeners = new HashSet();
 
     /**
@@ -57,19 +59,22 @@ public class NGInputStream extends FilterInputStream implements Closeable {
         super(in);
         din = (DataInputStream) this.in;
         this.out = out;
-	
-        final NGInputStream stream = this;
+
         final Thread mainThread = Thread.currentThread();
         readFuture = executor.submit(new Runnable(){
             public void run() {
                 try {
+                    Thread.currentThread().setName(mainThread.getName() + " read stream thread (NGInputStream pool)");
                     while(true) {
                         Future readHeaderFuture = executor.submit(new Runnable(){
                             public void run() {
+                                Thread.currentThread().setName(mainThread.getName() + " read chunk thread (NGInputStream pool)");
                                 try {
                                     readChunk();
                                 } catch (IOException e) {
                                     throw new RuntimeException(e);
+                                } finally {
+                                    Thread.currentThread().setName(Thread.currentThread().getName() + " (idle)");
                                 }
                             }
                         });
@@ -84,17 +89,28 @@ public class NGInputStream extends FilterInputStream implements Closeable {
                 } catch (InterruptedException e) {
                 } catch (ExecutionException e) {
                 } finally {
-                    stream.notifyClientListeners(serverLog, mainThread);
+                    readEof();
+                    notifyClientListeners(serverLog, mainThread);
+                    Thread.currentThread().setName(Thread.currentThread().getName() + " (idle)");
                 }
             }
         });
     }
 
+    /**
+     * Calls clientDisconnected method on all registered NGClientListeners.
+     * If any of the clientDisconnected methods throw an NGExitException due to calling System.exit()
+     * clientDisconnected processing is halted, the exit status is printed to the serverLog and the main
+     * thread is interrupted.
+     * @param serverLog The NailGun server log stream.
+     * @param mainThread The thread running nailMain which should be interrupted on System.exit()
+     */
     private synchronized void notifyClientListeners(PrintStream serverLog, Thread mainThread) {
         try {
             for (Iterator i = clientListeners.iterator(); i.hasNext();) {
                 ((NGClientListener) i.next()).clientDisconnected();
             }
+            serverLog.println(mainThread.getName() + " disconnected");
         }
         catch (NGExitException e) {
             serverLog.println(mainThread.getName() + " exited with status " + e.getStatus());
@@ -105,7 +121,10 @@ public class NGInputStream extends FilterInputStream implements Closeable {
         }
     }
 
-    public void close() {
+    /**
+     * Cancels the thread reading from the NailGun client.
+     */
+    public synchronized void close() {
 		readFuture.cancel(true);
 	}
 
@@ -120,6 +139,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      */
     private InputStream readPayload(InputStream in, int len) throws IOException {
 
+        byte[] receiveBuffer = new byte[len];
         int totalRead = 0;
         while (totalRead < len) {
             int currentRead = in.read(receiveBuffer, totalRead, len - totalRead);
@@ -131,39 +151,46 @@ public class NGInputStream extends FilterInputStream implements Closeable {
         return new ByteArrayInputStream(receiveBuffer);
     }
 
-	/**
-	 * Reads a NailGun chunk header from the underlying InputStream.
-	 * 
-	 * @throws IOException if thrown by the underlying InputStream,
-	 * or if an unexpected NailGun chunk type is encountered.
-	 */
-	private void readChunk() throws IOException {
+    /**
+     * Reads a NailGun chunk header from the underlying InputStream.
+     *
+     * @throws IOException if thrown by the underlying InputStream,
+     * or if an unexpected NailGun chunk type is encountered.
+     */
+    private synchronized void readChunk() throws IOException {
 
-        synchronized (din) {
-            int hlen = din.readInt();
-            byte chunkType = din.readByte();
-            lastReadTime = System.currentTimeMillis();
-            switch(chunkType) {
-                case NGConstants.CHUNKTYPE_STDIN:
-                    if (remaining != 0) throw new IOException("Data received before stdin stream was emptied.");
-                    remaining = hlen;
-                    stdin = readPayload(in, hlen);
-                    break;
+        int hlen = din.readInt();
+        byte chunkType = din.readByte();
+        lastReadTime = System.currentTimeMillis();
+        switch(chunkType) {
+            case NGConstants.CHUNKTYPE_STDIN:
+                if (remaining != 0) throw new IOException("Data received before stdin stream was emptied.");
+                remaining = hlen;
+                stdin = readPayload(in, hlen);
+                notify();
+                break;
 
-                case NGConstants.CHUNKTYPE_STDIN_EOF:
-                    eof = true;
-                    break;
+            case NGConstants.CHUNKTYPE_STDIN_EOF:
+                readEof();
+                break;
 
-                case NGConstants.CHUNKTYPE_HEARTBEAT:
-                    break;
+            case NGConstants.CHUNKTYPE_HEARTBEAT:
+                break;
 
-                default:
-                    throw(new IOException("Unknown stream type: " + (char) chunkType));
-            }
+            default:
+                throw(new IOException("Unknown stream type: " + (char) chunkType));
         }
     }
 
-	/**
+    /**
+     * Notify threads waiting in waitForChunk on either EOF chunk read or client disconnection.
+     */
+    private synchronized void readEof() {
+        eof = true;
+        notifyAll();
+    }
+
+    /**
 	 * @see java.io.InputStream#available()
 	 */
 	public int available() throws IOException {
@@ -182,7 +209,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
 	/**
 	 * @see java.io.InputStream#read()
 	 */
-	public int read() throws IOException {
+	public synchronized int read() throws IOException {
 		if (oneByteBuffer == null) oneByteBuffer = new byte[1];
 		return((read(oneByteBuffer, 0, 1) == -1) ? -1 : (int) oneByteBuffer[0]);
 	}
@@ -197,34 +224,42 @@ public class NGInputStream extends FilterInputStream implements Closeable {
 	/**
 	 * @see java.io.InputStream.read(byte[],offset,length)
 	 */
-	public int read(byte[] b, int offset, int length) throws IOException {
+	public synchronized int read(byte[] b, int offset, int length) throws IOException {
 		if (!started) {
-			sendStartInput();
+			sendSendInput();
 		}
 
-        while ((! eof) && remaining == 0) readChunk();
+        waitForChunk();
         if (eof) return(-1);
-		if (stdin == null) return 0;
 
 		int bytesToRead = Math.min((int) remaining, length);
 		int result = stdin.read(b, offset, bytesToRead);
 		remaining -= result;
-		if (remaining == 0) sendStartInput();
+		if (remaining == 0) sendSendInput();
 		return (result);
 	}
 
-	private void sendStartInput() throws IOException {
-		synchronized(out) {
-			out.writeInt(0);
-			out.writeByte(NGConstants.CHUNKTYPE_SENDINPUT);
-			out.flush();
-			started = true;
-		}
-	}
+    /**
+     * If EOF chunk has not been received, but no data is available, block until data is received, EOF or disconnection.
+     * @throws IOException which just wraps InterruptedExceptions thrown by wait.
+     */
+    private synchronized void waitForChunk() throws IOException {
+        try {
+            if((! eof) && (remaining == 0)) wait();
+        } catch (InterruptedException e) {
+            throw new IOException(e);
+        }
+    }
 
+    private synchronized void sendSendInput() throws IOException {
+        out.writeInt(0);
+        out.writeByte(NGConstants.CHUNKTYPE_SENDINPUT);
+        out.flush();
+        started = true;
+    }
 
 	/**
-	 * @return true if at least expected number of heartbeats are available to read.
+	 * @return true if interval since last read is less than 10 times expected heartbeat interval.
 	 */
 	public boolean isClientConnected() {
 	    long intervalMillis = System.currentTimeMillis() - lastReadTime;
