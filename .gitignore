@@ -4,3 +4,5 @@
 ng
 *.iml
 .idea/
+*.class
+*.jar
