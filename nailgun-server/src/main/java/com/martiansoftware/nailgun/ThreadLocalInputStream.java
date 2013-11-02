@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Martian Software, Inc.
 
@@ -27,9 +27,9 @@ import java.io.InputStream;
  * being local to the current Thread.  By setting System.in to a
  * ThreadLocalInputStream, different Threads can read from different
  * InputStreams simply by using System.in.  Of course, the init()
- * method must be called by the Thread that wishes to use the 
+ * method must be called by the Thread that wishes to use the
  * wrapped stream.
- *  
+ *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 class ThreadLocalInputStream extends InputStream {
@@ -40,7 +40,7 @@ class ThreadLocalInputStream extends InputStream {
     private InheritableThreadLocal streams = null;
 
     private InputStream defaultInputStream = null;
-    
+
     /**
      * @param defaultInputStream the InputStream that will be used if the
      * current thread has not called init()
@@ -65,8 +65,8 @@ class ThreadLocalInputStream extends InputStream {
      * @return this thread's InputStream
      */
     InputStream getInputStream() {
-    	InputStream result = (InputStream) streams.get();
-    	return ((result == null) ? defaultInputStream : result);
+        InputStream result = (InputStream) streams.get();
+        return ((result == null) ? defaultInputStream : result);
     }
 
 //  BEGIN delegated java.io.InputStream methods
