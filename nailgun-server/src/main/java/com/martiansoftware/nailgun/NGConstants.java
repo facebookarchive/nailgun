@@ -88,6 +88,16 @@ public class NGConstants {
     public static final byte CHUNKTYPE_HEARTBEAT = 'H';
 
     /**
+     * Chunk type marker for classpaths sent to append to the server's classpath.
+     */
+    public static final byte CHUNKTYPE_CLASSPATH = 'P';
+
+    /**
+     * Chunk type marker for command line defined variables.
+     */
+    public static final byte CHUNKTYPE_DEFINE = 'F';
+
+    /**
      * Server version number
      */
     public static final String VERSION;

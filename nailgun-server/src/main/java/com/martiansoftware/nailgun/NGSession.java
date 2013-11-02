@@ -1,4 +1,4 @@
-/*   
+/*
 
  Copyright 2004-2012, Martian Software, Inc.
 
@@ -19,11 +19,14 @@ package com.martiansoftware.nailgun;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.Socket;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.List;
 import java.util.Properties;
 
@@ -92,13 +95,13 @@ public class NGSession extends Thread {
 
         nailMainSignature = new Class[1];
         nailMainSignature[0] = NGContext.class;
-        
+
         try {
             classLoader = NGSession.class.getClassLoader();
         } catch (SecurityException e) {
             throw e;
         }
-        
+
     }
 
     /**
@@ -177,6 +180,7 @@ public class NGSession extends Thread {
         updateThreadName(null);
 
         Socket socket = nextSocket();
+        List remoteClasspath = new java.util.ArrayList();
         while (socket != null) {
             try {
                 DataInputStream sockin = new DataInputStream(socket.getInputStream());
@@ -197,6 +201,7 @@ public class NGSession extends Thread {
                     byte[] b = new byte[(int) bytesToRead];
                     sockin.readFully(b);
                     String line = new String(b, "US-ASCII");
+                    int equalsIndex;
 
                     switch (chunkType) {
 
@@ -205,9 +210,28 @@ public class NGSession extends Thread {
                             remoteArgs.add(line);
                             break;
 
+                        case NGConstants.CHUNKTYPE_CLASSPATH:
+                            // TODO: skip duplicated classpaths.
+                            remoteClasspath.add(line);
+                            addToSystemClassLoader(new File(line).toURL());
+                            break;
+
+                        case NGConstants.CHUNKTYPE_DEFINE:
+                            //	parse define into system property
+                            equalsIndex = line.indexOf('=');
+                            if (equalsIndex > 0) {
+                                System.setProperty(
+                                        line.substring(0, equalsIndex),
+                                        line.substring(equalsIndex + 1));
+                            } else {
+                                String key = line.substring(0, equalsIndex);
+                                // TODO: System.setProperty(key);
+                            }
+                            break;
+
                         case NGConstants.CHUNKTYPE_ENVIRONMENT:
                             //	parse environment into property
-                            int equalsIndex = line.indexOf('=');
+                            equalsIndex = line.indexOf('=');
                             if (equalsIndex > 0) {
                                 remoteEnv.setProperty(
                                         line.substring(0, equalsIndex),
@@ -263,7 +287,7 @@ public class NGSession extends Thread {
                     boolean isStaticNail = true; // See: NonStaticNail.java
 
                     Class[] interfaces = cmdclass.getInterfaces();
-                    
+
                     for (int i = 0; i < interfaces.length; i++){
                         if (interfaces[i].equals(NonStaticNail.class)){
                             isStaticNail = false; break;
@@ -271,12 +295,12 @@ public class NGSession extends Thread {
                     }
 
                     if (!isStaticNail){
-                        
+
                         mainMethod = cmdclass.getMethod("nailMain", new Class[]{ String[].class });
                         methodArgs[0] = cmdlineArgs;
-                        
+
                     } else {
-                        
+
                         try {
                             mainMethod = cmdclass.getMethod("nailMain", nailMainSignature);
                             NGContext context = new NGContext();
@@ -300,9 +324,9 @@ public class NGSession extends Thread {
                             mainMethod = cmdclass.getMethod("main", mainSignature);
                             methodArgs[0] = cmdlineArgs;
                         }
-        
+
                     }
-                    
+
                     if (mainMethod != null) {
                         server.nailStarted(cmdclass);
                         NGSecurityManager.setExit(exit);
@@ -318,7 +342,7 @@ public class NGSession extends Thread {
                         } catch (InstantiationException e){
                             throw (e);
                         } catch (IllegalAccessException e){
-                            throw (e);  
+                            throw (e);
                         } catch (Throwable t) {
                             throw (t);
                         } finally {
@@ -361,5 +385,27 @@ public class NGSession extends Thread {
      */
     private void updateThreadName(String detail) {
         setName("NGSession " + instanceNumber + ": " + ((detail == null) ? "(idle)" : detail));
+    }
+
+    /**
+     * Adds the specified URL (for a jar or a directory) to the System
+     * ClassLoader.  This code was written by antony_miguel and posted on
+     * http://forum.java.sun.com/thread.jsp?forum=32&thread=300557&message=1191210
+     * I assume it has been placed in the public domain.
+     * 
+     * @param url the URL of the resource (directory or jar) to add to the
+     * System classpath 
+     * @throws Exception if anything goes wrong.  The most likely culprit, should
+     * this ever arise, would be that your VM is not using a URLClassLoader as the
+     * System ClassLoader.  This would result in a ClassClastException that you
+     * probably can't do much about.
+     */
+    private static void addToSystemClassLoader(URL url) throws Exception {
+        URLClassLoader sysloader = (URLClassLoader) ClassLoader.getSystemClassLoader();
+        Class sysclass = URLClassLoader.class;
+
+        java.lang.reflect.Method method = sysclass.getDeclaredMethod("addURL", new Class[] {URL.class});
+        method.setAccessible(true);
+        method.invoke(sysloader, new Object[]{url});
     }
 }

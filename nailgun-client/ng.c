@@ -97,6 +97,8 @@
 #define CHUNKTYPE_EXIT 'X'
 #define CHUNKTYPE_SENDINPUT 'S'
 #define CHUNKTYPE_HEARTBEAT 'H'
+#define CHUNKTYPE_CLASSPATH 'P'
+#define CHUNKTYPE_DEFINE 'F'
 
 #define HEARTBEAT_TIMEOUT_MILLIS 500
 
@@ -606,6 +608,11 @@ void usage(int exitcode) {
   cleanUpAndExit(exitcode);
 }
 
+struct define_t {
+    char *define;
+    struct define_t *next;
+} define_t;
+
 int main(int argc, char *argv[], char *env[]) {
   int i;
   struct sockaddr_in server_addr;
@@ -616,6 +623,10 @@ int main(int argc, char *argv[], char *env[]) {
   struct hostent *hostinfo;
   char *cmd;
   int firstArgIndex;           /* the first argument _to pass to the server_ */
+  int defines = 0;
+  char *define_list[100];
+  int classpaths = 0;
+  char *classpath_list[100];
 
   #ifndef WIN32
     fd_set readfds;
@@ -687,6 +698,25 @@ int main(int argc, char *argv[], char *env[]) {
       argv[i] = NULL;
     } else if (!strcmp("--nailgun-help", argv[i])) {
       usage(0);
+    } else if (!strcmp("-classpath", argv[i]) && cmd == NULL) {
+      if (i == argc - 1) usage (NAILGUN_BAD_ARGUMENTS);
+      classpath_list[classpaths++] = argv[i + 1];
+      argv[i] = argv[i + 1]= NULL;
+      ++i;
+    } else if (!strncmp("-D", argv[i], 2) && cmd == NULL) {
+      char *arg;
+
+      if (argv[i][2])
+        arg = argv[i] + 2;
+      else {
+        if (i == argc - 1) usage(NAILGUN_BAD_ARGUMENTS);
+        argv[i] = NULL;
+        arg = argv[++i];
+      }
+
+      define_list[defines++] = arg;
+
+      argv[i] = NULL;
     } else if (cmd == NULL) {
       cmd = argv[i];
       firstArgIndex = i + 1;
@@ -743,6 +773,19 @@ int main(int argc, char *argv[], char *env[]) {
   sendText(CHUNKTYPE_ENV, NAILGUN_PATHSEPARATOR);
   for(i = 0; env[i]; ++i) {
     sendText(CHUNKTYPE_ENV, env[i]);
+  }
+
+  /* now send defines and classpaths */
+  for(i = 0; i < defines; ++i) {
+    if (define_list[i]) {
+      sendText(CHUNKTYPE_DEFINE, define_list[i]);
+    }
+  }
+
+  for(i = 0; i < classpaths; ++i) {
+    if (classpath_list[i]) {
+      sendText(CHUNKTYPE_CLASSPATH, classpath_list[i]);
+    }
   }
 
   /* now send the working directory */
