@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Jim Purbrick.
 
@@ -24,7 +24,7 @@ import java.io.IOException;
 
 /**
  * Print one  hash per second to standard out while the client is running.
- * 
+ *
  * @author <a href="http://jimpurbrick.com">Jim Purbrick</a>
  */
 public class Heartbeat {
@@ -36,7 +36,7 @@ public class Heartbeat {
      * @param context the Nailgun context used to register the nail as a
      * {@link com.martiansoftware.nailgun.NGClientListener}.
      */
-	public static void nailMain(NGContext context) throws InterruptedException, IOException {
+    public static void nailMain(NGContext context) throws InterruptedException, IOException {
 
         // Register a new NGClientListener. As clientDisconnected is called from
         // another thread any nail state access must be properly synchronized.
@@ -53,5 +53,5 @@ public class Heartbeat {
             Thread.sleep(1000);
             System.out.print("#");
         }
-	}
+    }
 }

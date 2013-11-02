@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Martian Software, Inc.
 
@@ -24,17 +24,17 @@ import com.martiansoftware.nailgun.NGContext;
  * Prompts the user for input using a JOptionPane, and displays the
  * result to the client's stdout.  If the user clicks "cancel", the
  * client exits with exit code 1.
- * 
+ *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class Prompt {
 
-	public static void nailMain(NGContext context) {
-		String result = javax.swing.JOptionPane.showInputDialog(null, "Input:");
-		if (result == null) {
-			context.exit(1);
-		} else {
-			context.out.println(result);
-		}
-	}
+    public static void nailMain(NGContext context) {
+        String result = javax.swing.JOptionPane.showInputDialog(null, "Input:");
+        if (result == null) {
+            context.exit(1);
+        } else {
+            context.out.println(result);
+        }
+    }
 }

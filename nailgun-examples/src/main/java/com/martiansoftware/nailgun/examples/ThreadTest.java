@@ -1,4 +1,4 @@
-/*   
+/*
 
 Copyright 2004-2012, Martian Software, Inc.
 
@@ -23,32 +23,32 @@ package com.martiansoftware.nailgun.examples;
  * inherited by child threads.  A bunch of numbers and thread ids are displayed
  * to the client's stdout.  The important thing is that all threads launched
  * by the nail are writing to the same client.
- * 
+ *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class ThreadTest implements Runnable {
 
-	private String name = null;
-	
-	public ThreadTest(String name) {
-		this.name = name;
-	}
-	
-	public void run() {
-		for (int i = 0; i < 10; ++i) {
-			System.out.println(name + ": " + i);
-			try {Thread.sleep(100);} catch (Throwable t){}
-		}
-	}
-	
-	public static void main(String[] args) {
-		for (int i = 0; i < 3; ++i) {
-			Thread t = new Thread(new ThreadTest("T" + i));
-			t.start();
-			System.out.println("Started number " + i);
-		}
-		
-		try {Thread.sleep(2000);} catch (Throwable t) {}
-		System.out.println("Done.");
-	}
+    private String name = null;
+
+    public ThreadTest(String name) {
+        this.name = name;
+    }
+
+    public void run() {
+        for (int i = 0; i < 10; ++i) {
+            System.out.println(name + ": " + i);
+            try {Thread.sleep(100);} catch (Throwable t){}
+        }
+    }
+
+    public static void main(String[] args) {
+        for (int i = 0; i < 3; ++i) {
+            Thread t = new Thread(new ThreadTest("T" + i));
+            t.start();
+            System.out.println("Started number " + i);
+        }
+
+        try {Thread.sleep(2000);} catch (Throwable t) {}
+        System.out.println("Done.");
+    }
 }

@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Martian Software, Inc.
 
@@ -26,29 +26,29 @@ import com.martiansoftware.nailgun.NGContext;
 
 /**
  * <p>Displays all <a href="NailStats.html">NailStats</a> tracked by the server.</p>
- * 
+ *
  * <p>This can be run standalone with no arguments.  It will also run automatically
  * upon <code>NGServer</code> shutdown, sending its output to the server's <code>System.out</code>.</p>
- * 
+ *
  * <p>This is aliased by default to the command "<code>ng-stats</code>".</p>
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 
 public class NGServerStats {
 
-	public static void nailShutdown(NGServer server) {
-		dumpStats(server, server.out);
-	}
-	
-	public static void nailMain(NGContext context) {
-		dumpStats(context.getNGServer(), context.out);
-	}
+    public static void nailShutdown(NGServer server) {
+        dumpStats(server, server.out);
+    }
 
-	private static void dumpStats(NGServer server, java.io.PrintStream out) {
-		Map stats = server.getNailStats();
-		for (Iterator i = stats.values().iterator(); i.hasNext();) {
-			out.println(i.next());
-		}
-	}
+    public static void nailMain(NGContext context) {
+        dumpStats(context.getNGServer(), context.out);
+    }
+
+    private static void dumpStats(NGServer server, java.io.PrintStream out) {
+        Map stats = server.getNailStats();
+        for (Iterator i = stats.values().iterator(); i.hasNext();) {
+            out.println(i.next());
+        }
+    }
 
 }

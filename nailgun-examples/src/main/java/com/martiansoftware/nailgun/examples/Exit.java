@@ -1,4 +1,4 @@
-/*   
+/*
 
 Copyright 2004-2012, Martian Software, Inc.
 
@@ -20,14 +20,13 @@ package com.martiansoftware.nailgun.examples;
 
 public class Exit {
 
-	public static void main (String[] args) {
-       	int exitCode = (int) ((Math.random() * 1000) + 1);
-       	if (args.length > 0) {
-	       	try {
-	       		exitCode = Integer.parseInt(args[0]);
-	       	} catch (Exception e) {}
-       	}
-       	System.exit(exitCode);
-      }
-	
+    public static void main (String[] args) {
+        int exitCode = (int) ((Math.random() * 1000) + 1);
+        if (args.length > 0) {
+            try {
+                exitCode = Integer.parseInt(args[0]);
+            } catch (Exception e) {}
+        }
+        System.exit(exitCode);
+    }
 }

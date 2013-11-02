@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Martian Software, Inc.
 
@@ -27,7 +27,7 @@ import java.util.concurrent.*;
 /**
  * A FilterInputStream that is able to read the chunked stdin stream
  * from a NailGun client.
- * 
+ *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class NGInputStream extends FilterInputStream implements Closeable {
@@ -48,7 +48,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     private final Set clientListeners = new HashSet();
 
     /**
-	 * Creates a new NGInputStream wrapping the specified InputStream.
+     * Creates a new NGInputStream wrapping the specified InputStream.
      * Also sets up a timer to periodically consume heartbeats sent from the client and
      * call registered NGClientListeners if a client disconnection is detected.
      * @param in the InputStream to wrap
@@ -125,8 +125,8 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      * Cancels the thread reading from the NailGun client.
      */
     public synchronized void close() {
-		readFuture.cancel(true);
-	}
+        readFuture.cancel(true);
+    }
 
     /**
      * Reads a NailGun chunk payload from {@link #in} and returns an InputStream that reads from
@@ -191,53 +191,53 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     }
 
     /**
-	 * @see java.io.InputStream#available()
-	 */
-	public int available() throws IOException {
-		if (eof) return(0);
-		if (stdin == null) return(0);
-		return stdin.available();
-	}
+     * @see java.io.InputStream#available()
+     */
+    public int available() throws IOException {
+        if (eof) return(0);
+        if (stdin == null) return(0);
+        return stdin.available();
+    }
 
-	/**
-	 * @see java.io.InputStream#markSupported()
-	 */
-	public boolean markSupported() {
-		return (false);
-	}
+    /**
+     * @see java.io.InputStream#markSupported()
+     */
+    public boolean markSupported() {
+        return (false);
+    }
 
-	/**
-	 * @see java.io.InputStream#read()
-	 */
-	public synchronized int read() throws IOException {
-		if (oneByteBuffer == null) oneByteBuffer = new byte[1];
-		return((read(oneByteBuffer, 0, 1) == -1) ? -1 : (int) oneByteBuffer[0]);
-	}
+    /**
+     * @see java.io.InputStream#read()
+     */
+    public synchronized int read() throws IOException {
+        if (oneByteBuffer == null) oneByteBuffer = new byte[1];
+        return((read(oneByteBuffer, 0, 1) == -1) ? -1 : (int) oneByteBuffer[0]);
+    }
 
-	/**
-	 * @see java.io.InputStream.read(byte[])
-	 */
-	public int read(byte[] b) throws IOException {
-		return (read(b, 0, b.length));
-	}
+    /**
+     * @see java.io.InputStream.read(byte[])
+     */
+    public int read(byte[] b) throws IOException {
+        return (read(b, 0, b.length));
+    }
 
-	/**
-	 * @see java.io.InputStream.read(byte[],offset,length)
-	 */
-	public synchronized int read(byte[] b, int offset, int length) throws IOException {
-		if (!started) {
-			sendSendInput();
-		}
+    /**
+     * @see java.io.InputStream.read(byte[],offset,length)
+     */
+    public synchronized int read(byte[] b, int offset, int length) throws IOException {
+        if (!started) {
+            sendSendInput();
+        }
 
         waitForChunk();
         if (eof) return(-1);
 
-		int bytesToRead = Math.min((int) remaining, length);
-		int result = stdin.read(b, offset, bytesToRead);
-		remaining -= result;
-		if (remaining == 0) sendSendInput();
-		return (result);
-	}
+        int bytesToRead = Math.min((int) remaining, length);
+        int result = stdin.read(b, offset, bytesToRead);
+        remaining -= result;
+        if (remaining == 0) sendSendInput();
+        return (result);
+    }
 
     /**
      * If EOF chunk has not been received, but no data is available, block until data is received, EOF or disconnection.
@@ -258,23 +258,23 @@ public class NGInputStream extends FilterInputStream implements Closeable {
         started = true;
     }
 
-	/**
-	 * @return true if interval since last read is less than 10 times expected heartbeat interval.
-	 */
-	public boolean isClientConnected() {
-	    long intervalMillis = System.currentTimeMillis() - lastReadTime;
-	    return intervalMillis < (NGConstants.HEARTBEAT_INTERVAL_MILLIS * 10);
-	}
+    /**
+     * @return true if interval since last read is less than 10 times expected heartbeat interval.
+     */
+    public boolean isClientConnected() {
+        long intervalMillis = System.currentTimeMillis() - lastReadTime;
+        return intervalMillis < (NGConstants.HEARTBEAT_INTERVAL_MILLIS * 10);
+    }
 
     /**
      * @param listener the {@link NGClientListener} to be notified of client events.
      */
     public synchronized void addClientListener(NGClientListener listener) {
-	if (readFuture.isDone()) {
-	    listener.clientDisconnected(); // Client has already disconnected, so call clientDisconnected immediately.
-	} else {
-	    clientListeners.add(listener);
-	}
+    if (readFuture.isDone()) {
+        listener.clientDisconnected(); // Client has already disconnected, so call clientDisconnected immediately.
+    } else {
+        clientListeners.add(listener);
+    }
     }
 
     /**

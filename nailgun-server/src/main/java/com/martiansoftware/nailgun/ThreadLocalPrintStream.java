@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Martian Software, Inc.
 
@@ -27,9 +27,9 @@ import java.io.PrintStream;
  * being local to the current Thread.  By setting System.out to a
  * ThreadLocalPrintStream, different Threads can write to different
  * PrintStreams simply by using System.out.  Of course, the init()
- * method must be called by the Thread that wishes to use the 
+ * method must be called by the Thread that wishes to use the
  * wrapped stream.
- *  
+ *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 class ThreadLocalPrintStream extends PrintStream {
@@ -40,7 +40,7 @@ class ThreadLocalPrintStream extends PrintStream {
     private InheritableThreadLocal streams = null;
 
     private PrintStream defaultPrintStream = null;
-    
+
     /**
      * Creates a new InheritedThreadLocalPrintStream
      * @param defaultPrintStream the PrintStream that will be used if the

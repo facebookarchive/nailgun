@@ -1,4 +1,4 @@
-/*   
+/*
 
  Copyright 2004-2012, Martian Software, Inc.
 
@@ -46,73 +46,73 @@ public class NGServer implements Runnable {
      * Default size for thread pool
      */
     public static final int DEFAULT_SESSIONPOOLSIZE = 10;
-    
+
     /**
      * The address on which to listen, or null to listen on all local addresses
      */
     private InetAddress addr = null;
-    
+
     /**
      * The port on which to listen, or zero to select a port automatically
      */
     private int port = 0;
-    
+
     /**
      * The socket doing the listening
      */
     private ServerSocket serversocket;
-    
+
     /**
      * True if this NGServer has received instructions to shut down
      */
     private boolean shutdown = false;
-    
+
     /**
      * True if this NGServer has been started and is accepting connections
      */
     private boolean running = false;
-    
+
     /**
      * This NGServer's AliasManager, which maps aliases to classes
      */
     private AliasManager aliasManager;
-    
+
     /**
      * If true, fully-qualified classnames are valid commands
      */
     private boolean allowNailsByClassName = true;
-    
+
     /**
      * The default class to use if an invalid alias or classname is specified by
      * the client.
      */
     private Class defaultNailClass = null;
-    
+
     /**
      * A pool of NGSessions ready to handle client connections
      */
     private NGSessionPool sessionPool = null;
-    
+
     /**
      * <code>System.out</code> at the time of the NGServer's creation
      */
     public final PrintStream out = System.out;
-    
+
     /**
      * <code>System.err</code> at the time of the NGServer's creation
      */
     public final PrintStream err = System.err;
-    
+
     /**
      * <code>System.in</code> at the time of the NGServer's creation
      */
     public final InputStream in = System.in;
-    
+
     /**
      * a collection of all classes executed by this server so far
      */
     private Map allNailStats = null;
-    
+
     /**
      * Remember the security manager we start with so we can restore it later
      */
@@ -162,7 +162,7 @@ public class NGServer implements Runnable {
     public NGServer() {
         init(null, NGConstants.DEFAULT_PORT, DEFAULT_SESSIONPOOLSIZE);
     }
-    
+
     /**
      * Sets up the NGServer internals
      *

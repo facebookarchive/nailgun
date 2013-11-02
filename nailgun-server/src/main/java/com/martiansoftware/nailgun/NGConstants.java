@@ -1,4 +1,4 @@
-/*   
+/*
 
  Copyright 2004-2012, Martian Software, Inc.
 
@@ -86,6 +86,16 @@ public class NGConstants {
      * Chunk type marker for heartbeats sent to let the server know the client is still alive.
      */
     public static final byte CHUNKTYPE_HEARTBEAT = 'H';
+
+    /**
+     * Chunk type marker for classpaths sent to append to the server's classpath.
+     */
+    public static final byte CHUNKTYPE_CLASSPATH = 'P';
+
+    /**
+     * Chunk type marker for command line defined variables.
+     */
+    public static final byte CHUNKTYPE_DEFINE = 'F';
 
     /**
      * Server version number

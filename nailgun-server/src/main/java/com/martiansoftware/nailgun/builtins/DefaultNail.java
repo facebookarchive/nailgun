@@ -1,4 +1,4 @@
-/*   
+/*
 
 Copyright 2004-2012, Martian Software, Inc.
 
@@ -25,13 +25,13 @@ import com.martiansoftware.nailgun.NGConstants;
  * The default nail class used by the server when an invalid command (nonexisting
  * classname or alias) is issued.  This simply displays an error message to the
  * client's stdout and has the client exit with value NGConstants.EXIT_NOSUCHCOMMAND.
- * 
+ *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class DefaultNail {
 
-	public static void nailMain(NGContext context) {
-		context.err.println("No such command: " + context.getCommand());
-		context.exit(NGConstants.EXIT_NOSUCHCOMMAND);
-	}
+    public static void nailMain(NGContext context) {
+        context.err.println("No such command: " + context.getCommand());
+        context.exit(NGConstants.EXIT_NOSUCHCOMMAND);
+    }
 }
