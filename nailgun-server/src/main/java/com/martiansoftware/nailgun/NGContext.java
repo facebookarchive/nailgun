@@ -286,4 +286,18 @@ public class NGContext {
     public void removeClientListener(NGClientListener listener) {
         getInputStream().removeClientListener(listener);
     }
+
+    /**
+     * @param listener the {@link com.martiansoftware.nailgun.NGHeartbeatListener} to be notified of client events.
+     */
+    public void addHeartbeatListener(NGHeartbeatListener listener) {
+        getInputStream().addHeartbeatListener(listener);
+    }
+
+    /**
+     * @param listener the {@link NGHeartbeatListener} to no longer be notified of client events.
+     */
+    public void removeHeartbeatListener(NGHeartbeatListener listener) {
+        getInputStream().removeHeartbeatListener(listener);
+    }
 }

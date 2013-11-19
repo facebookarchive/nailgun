@@ -46,6 +46,8 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     private long lastReadTime = System.currentTimeMillis();
     private final Future readFuture;
     private final Set clientListeners = new HashSet();
+    private final Set heartbeatListeners = new HashSet();
+    private final int heartbeatTimeoutMillis;
 
     /**
 	 * Creates a new NGInputStream wrapping the specified InputStream.
@@ -54,11 +56,13 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      * @param in the InputStream to wrap
      * @param out the OutputStream to which SENDINPUT chunks should be sent
      * @param serverLog the PrintStream to which server logging messages should be written
+     * @param heartbeatTimeoutMillis the interval between heartbeats before considering the client disconnected
      */
-    public NGInputStream(InputStream in, DataOutputStream out, final PrintStream serverLog) {
+    public NGInputStream(InputStream in, DataOutputStream out, final PrintStream serverLog, final int heartbeatTimeoutMillis) {
         super(in);
         din = (DataInputStream) this.in;
         this.out = out;
+        this.heartbeatTimeoutMillis = heartbeatTimeoutMillis;
 
         final Thread mainThread = Thread.currentThread();
         readFuture = executor.submit(new Runnable(){
@@ -79,7 +83,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
                             }
                         });
                         try {
-                            readHeaderFuture.get(NGConstants.HEARTBEAT_INTERVAL_MILLIS * 10, TimeUnit.MILLISECONDS);
+                            readHeaderFuture.get(heartbeatTimeoutMillis, TimeUnit.MILLISECONDS);
                         } catch (TimeoutException e) {
                             if (! isClientConnected()) {
                                 break;
@@ -161,7 +165,9 @@ public class NGInputStream extends FilterInputStream implements Closeable {
 
         int hlen = din.readInt();
         byte chunkType = din.readByte();
-        lastReadTime = System.currentTimeMillis();
+        long readTime = System.currentTimeMillis();
+        long intervalMillis = readTime - lastReadTime;
+        lastReadTime = readTime;
         switch(chunkType) {
             case NGConstants.CHUNKTYPE_STDIN:
                 if (remaining != 0) throw new IOException("Data received before stdin stream was emptied.");
@@ -175,6 +181,9 @@ public class NGInputStream extends FilterInputStream implements Closeable {
                 break;
 
             case NGConstants.CHUNKTYPE_HEARTBEAT:
+                for (Iterator i = heartbeatListeners.iterator(); i.hasNext();) {
+                    ((NGHeartbeatListener) i.next()).heartbeatReceived(intervalMillis);
+                }
                 break;
 
             default:
@@ -263,18 +272,18 @@ public class NGInputStream extends FilterInputStream implements Closeable {
 	 */
 	public boolean isClientConnected() {
 	    long intervalMillis = System.currentTimeMillis() - lastReadTime;
-	    return intervalMillis < (NGConstants.HEARTBEAT_INTERVAL_MILLIS * 10);
+	    return intervalMillis < heartbeatTimeoutMillis;
 	}
 
     /**
      * @param listener the {@link NGClientListener} to be notified of client events.
      */
     public synchronized void addClientListener(NGClientListener listener) {
-	if (readFuture.isDone()) {
-	    listener.clientDisconnected(); // Client has already disconnected, so call clientDisconnected immediately.
-	} else {
-	    clientListeners.add(listener);
-	}
+        if (readFuture.isDone()) {
+            listener.clientDisconnected(); // Client has already disconnected, so call clientDisconnected immediately.
+        } else {
+            clientListeners.add(listener);
+        }
     }
 
     /**
@@ -282,5 +291,19 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      */
     public synchronized void removeClientListener(NGClientListener listener) {
         clientListeners.remove(listener);
+    }
+
+    /**
+     * @param listener the {@link NGHeartbeatListener} to be notified of client events.
+     */
+    public synchronized void addHeartbeatListener(NGHeartbeatListener listener) {
+        heartbeatListeners.add(listener);
+    }
+
+    /**
+     * @param listener the {@link NGClientListener} to no longer be notified of client events.
+     */
+    public synchronized void removeHeartbeatListener(NGHeartbeatListener listener) {
+        heartbeatListeners.remove(listener);
     }
 }

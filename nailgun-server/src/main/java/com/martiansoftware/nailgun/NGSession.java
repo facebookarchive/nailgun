@@ -63,6 +63,12 @@ public class NGSession extends Thread {
      * NGSession to be created, then this is the value for N.
      */
     private long instanceNumber = 0;
+
+    /**
+     * The interval to wait between heartbeats before considering the client to have disconnected.
+     */
+    private int heartbeatTimeoutMillis = NGConstants.HEARTBEAT_TIMEOUT_MILLIS;
+
     /**
      * A lock shared among all NGSessions
      */
@@ -112,6 +118,7 @@ public class NGSession extends Thread {
         super();
         this.sessionPool = sessionPool;
         this.server = server;
+        this.heartbeatTimeoutMillis = server.getHeartbeatTimeout();
 
         synchronized (sharedLock) {
             this.instanceNumber = ++instanceCounter;
@@ -235,7 +242,7 @@ public class NGSession extends Thread {
                 // can't create NGInputStream until we've received a command, because at
                 // that point the stream from the client will only include stdin and stdin-eof
                 // chunks
-                InputStream in = new NGInputStream(sockin, sockout, server.out);
+                InputStream in = new NGInputStream(sockin, sockout, server.out, heartbeatTimeoutMillis);
                 PrintStream out = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDOUT));
                 PrintStream err = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDERR));
                 PrintStream exit = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_EXIT));
