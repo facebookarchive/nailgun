@@ -117,6 +117,7 @@ public class NGServer implements Runnable {
      * Remember the security manager we start with so we can restore it later
      */
     private SecurityManager originalSecurityManager = null;
+    private int heartbeatTimeoutMillis = NGConstants.HEARTBEAT_TIMEOUT_MILLIS;
 
     /**
      * Creates a new NGServer that will listen at the specified address and on
@@ -131,8 +132,8 @@ public class NGServer implements Runnable {
      * @param sessionPoolSize the max number of idle sessions allowed by the
      * pool
      */
-    public NGServer(InetAddress addr, int port, int sessionPoolSize) {
-        init(addr, port, sessionPoolSize);
+    public NGServer(InetAddress addr, int port, int sessionPoolSize, int timeoutMillis) {
+        init(addr, port, sessionPoolSize, timeoutMillis);
     }
 
     /**
@@ -145,11 +146,9 @@ public class NGServer implements Runnable {
      * @param addr the address at which to listen, or
      * <code>null</code> to bind to all local addresses
      * @param port the port on which to listen.
-     * @param sessionPoolSize the max number of idle sessions allowed by the
-     * pool
      */
     public NGServer(InetAddress addr, int port) {
-        init(addr, port, DEFAULT_SESSIONPOOLSIZE);
+        init(addr, port, DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
     }
 
     /**
@@ -160,9 +159,9 @@ public class NGServer implements Runnable {
      * <code>NGServer</code> and start it.
      */
     public NGServer() {
-        init(null, NGConstants.DEFAULT_PORT, DEFAULT_SESSIONPOOLSIZE);
+        init(null, NGConstants.DEFAULT_PORT, DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
     }
-    
+
     /**
      * Sets up the NGServer internals
      *
@@ -171,7 +170,7 @@ public class NGServer implements Runnable {
      * @param sessionPoolSize the max number of idle sessions allowed by the
      * pool
      */
-    private void init(InetAddress addr, int port, int sessionPoolSize) {
+    private void init(InetAddress addr, int port, int sessionPoolSize, int timeoutMillis) {
         this.addr = addr;
         this.port = port;
 
@@ -180,6 +179,7 @@ public class NGServer implements Runnable {
         // allow a maximum of 10 idle threads.  probably too high a number
         // and definitely should be configurable in the future
         sessionPool = new NGSessionPool(this, sessionPoolSize);
+        this.heartbeatTimeoutMillis = timeoutMillis;
     }
 
     /**
@@ -438,6 +438,7 @@ public class NGServer implements Runnable {
         System.err.println("   or: java com.martiansoftware.nailgun.NGServer port");
         System.err.println("   or: java com.martiansoftware.nailgun.NGServer IPAddress");
         System.err.println("   or: java com.martiansoftware.nailgun.NGServer IPAddress:port");
+        System.err.println("   or: java com.martiansoftware.nailgun.NGServer IPAddress:port timeout");
     }
 
     /**
@@ -453,7 +454,7 @@ public class NGServer implements Runnable {
      */
     public static void main(String[] args) throws NumberFormatException, UnknownHostException {
 
-        if (args.length > 1) {
+        if (args.length > 2) {
             usage();
             return;
         }
@@ -461,11 +462,16 @@ public class NGServer implements Runnable {
         // null server address means bind to everything local
         InetAddress serverAddress = null;
         int port = NGConstants.DEFAULT_PORT;
+        int timeoutMillis = NGConstants.HEARTBEAT_TIMEOUT_MILLIS;
 
-        // parse the sole command line parameter, which
+
+        // parse the command line parameters, which
         // may be an inetaddress to bind to, a port number,
         // or an inetaddress followed by a port, separated
-        // by a colon
+        // by a colon. if a second parameter is provided it
+        // is interpreted as the number of milliseconds to
+        // wait between heartbeats before considering the
+        // client to have disconnected.
         if (args.length != 0) {
             String[] argParts = args[0].split(":");
             String addrPart = null;
@@ -484,9 +490,12 @@ public class NGServer implements Runnable {
             if (portPart != null) {
                 port = Integer.parseInt(portPart);
             }
+            if (args.length == 2) {
+                timeoutMillis = Integer.parseInt(args[1]);
+            }
         }
 
-        NGServer server = new NGServer(serverAddress, port, DEFAULT_SESSIONPOOLSIZE);
+        NGServer server = new NGServer(serverAddress, port, DEFAULT_SESSIONPOOLSIZE, timeoutMillis);
         Thread t = new Thread(server);
         t.setName("NGServer(" + serverAddress + ", " + port + ")");
         t.start();
@@ -514,6 +523,10 @@ public class NGServer implements Runnable {
                 + ", port "
                 + runningPort
                 + ".");
+    }
+
+    public int getHeartbeatTimeout() {
+        return heartbeatTimeoutMillis;
     }
 
     /**

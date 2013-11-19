@@ -98,6 +98,11 @@ public class NGConstants {
     public static final short HEARTBEAT_INTERVAL_MILLIS = 1000;
 
     /**
+     * Maximum interval to wait between heartbeats before considering client to have disconnected.
+     */
+    public static final short HEARTBEAT_TIMEOUT_MILLIS = 10000;
+
+    /**
      * Maximum chunk len sent from client.
      */
     public static final short MAXIMUM_CHUNK_LENGTH = 2048;
