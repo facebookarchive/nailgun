@@ -335,13 +335,13 @@ public class NGSession extends Thread {
                     }
 
                 } catch (NGExitException exitEx) {
+                    in.close();
                     exit.println(exitEx.getStatus());
                     server.out.println(Thread.currentThread().getName() + " exited with status " + exitEx.getStatus());
                 } catch (Throwable t) {
+                    in.close();
                     t.printStackTrace();
                     exit.println(NGConstants.EXIT_EXCEPTION); // remote exception constant
-                } finally {
-                    in.close();
                 }
 
                 sockout.flush();
