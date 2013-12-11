@@ -105,15 +105,15 @@ public class NGContext {
 		super();
 	}
 	
-	void setExitStream(PrintStream exitStream) {
+	public void setExitStream(PrintStream exitStream) {
 		this.exitStream = exitStream;
 	}
 
-	void setPort(int remotePort) {
+	public void setPort(int remotePort) {
 		this.remotePort = remotePort;
 	}
 
-	void setCommand(String command) {
+	public void setCommand(String command) {
 		this.command = command;
 	}
 
