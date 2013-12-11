@@ -38,13 +38,13 @@ public class Heartbeat {
      * @param context the Nailgun context used to register the nail as a
      * {@link com.martiansoftware.nailgun.NGClientListener}.
      */
-	public static void nailMain(final NGContext context) throws InterruptedException, IOException {
+	public static void nailMain(final NGContext context) throws IOException {
 
         // Register a new NGClientListener. As clientDisconnected is called from
         // another thread any nail state access must be properly synchronized.
         context.addClientListener(new NGClientListener() {
-            public void clientDisconnected() {
-               System.exit(42); // Will interrupt the Thread.sleep() in the loop below.
+            public void clientDisconnected() throws InterruptedException {
+               throw new InterruptedException("Client Disconnected"); // Will interrupt the Thread.sleep() in the loop below.
             }
         });
 
@@ -57,10 +57,15 @@ public class Heartbeat {
 
         // Loop printing a hash to the client every second until client disconnects.
         // Polling isClientConnected() ensures that the loop exits even when I/O is not interrupted by
-        // the System.exit() call in clientDisconnected above.
-        while(context.isClientConnected()) {
-            Thread.sleep(5000);
-            context.out.print("S");
+        // the InterruptedException thrown by clientDisconnected above.
+        try {
+            while(context.isClientConnected()) {
+                Thread.sleep(5000);
+                context.out.print("S");
+            }
+        } catch (InterruptedException e) {
+        } finally {
+            System.exit(42);
         }
 	}
 }

@@ -82,19 +82,14 @@ public class NGInputStream extends FilterInputStream implements Closeable {
                                 }
                             }
                         });
-                        try {
-                            readHeaderFuture.get(heartbeatTimeoutMillis, TimeUnit.MILLISECONDS);
-                        } catch (TimeoutException e) {
-                            if (! isClientConnected()) {
-                                break;
-                            }
-                        }
+                        readHeaderFuture.get(heartbeatTimeoutMillis, TimeUnit.MILLISECONDS);
                     }
                 } catch (InterruptedException e) {
                 } catch (ExecutionException e) {
+                } catch (TimeoutException e) {
                 } finally {
-                    readEof();
                     notifyClientListeners(serverLog, mainThread);
+                    readEof();
                     Thread.currentThread().setName(Thread.currentThread().getName() + " (idle)");
                 }
             }
@@ -111,13 +106,17 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      */
     private synchronized void notifyClientListeners(PrintStream serverLog, Thread mainThread) {
         try {
-            for (Iterator i = clientListeners.iterator(); i.hasNext();) {
-                ((NGClientListener) i.next()).clientDisconnected();
+            if (! eof) {
+                for (Iterator i = clientListeners.iterator(); i.hasNext();) {
+                    ((NGClientListener) i.next()).clientDisconnected();
+                }
+                serverLog.println(mainThread.getName() + " disconnected");
             }
-            serverLog.println(mainThread.getName() + " disconnected");
+        }
+        catch (InterruptedException e) {
+            mainThread.interrupt();
         }
         catch (NGExitException e) {
-            serverLog.println(mainThread.getName() + " exited with status " + e.getStatus());
             mainThread.interrupt();
         }
         finally {
@@ -129,6 +128,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      * Cancels the thread reading from the NailGun client.
      */
     public synchronized void close() {
+        readEof();
 		readFuture.cancel(true);
 	}
 
@@ -268,7 +268,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     }
 
 	/**
-	 * @return true if interval since last read is less than 10 times expected heartbeat interval.
+	 * @return true if interval since last read is less than heartbeat timeout interval.
 	 */
 	public boolean isClientConnected() {
 	    long intervalMillis = System.currentTimeMillis() - lastReadTime;
@@ -279,9 +279,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      * @param listener the {@link NGClientListener} to be notified of client events.
      */
     public synchronized void addClientListener(NGClientListener listener) {
-        if (readFuture.isDone()) {
-            listener.clientDisconnected(); // Client has already disconnected, so call clientDisconnected immediately.
-        } else {
+        if (! readFuture.isDone()) {
             clientListeners.add(listener);
         }
     }
@@ -297,7 +295,9 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      * @param listener the {@link NGHeartbeatListener} to be notified of client events.
      */
     public synchronized void addHeartbeatListener(NGHeartbeatListener listener) {
-        heartbeatListeners.add(listener);
+        if (! readFuture.isDone()) {
+            heartbeatListeners.add(listener);
+        }
     }
 
     /**
