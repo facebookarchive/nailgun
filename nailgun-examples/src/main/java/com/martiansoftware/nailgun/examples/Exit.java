@@ -27,6 +27,9 @@ public class Exit {
 	       		exitCode = Integer.parseInt(args[0]);
 	       	} catch (Exception e) {}
        	}
+		// Close stdout to test the exit code is returned properly
+		// even in such case
+		System.out.close();
        	System.exit(exitCode);
       }
 	
