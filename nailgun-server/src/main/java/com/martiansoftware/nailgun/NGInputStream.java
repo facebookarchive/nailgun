@@ -161,33 +161,40 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      * @throws IOException if thrown by the underlying InputStream,
      * or if an unexpected NailGun chunk type is encountered.
      */
-    private synchronized void readChunk() throws IOException {
+    private void readChunk() throws IOException {
 
-        int hlen = din.readInt();
-        byte chunkType = din.readByte();
-        long readTime = System.currentTimeMillis();
-        long intervalMillis = readTime - lastReadTime;
-        lastReadTime = readTime;
-        switch(chunkType) {
-            case NGConstants.CHUNKTYPE_STDIN:
-                if (remaining != 0) throw new IOException("Data received before stdin stream was emptied.");
-                remaining = hlen;
-                stdin = readPayload(in, hlen);
-                notify();
-                break;
+        // Synchronize on the input stream to avoid blocking other threads while waiting for chunk headers.
+        synchronized (this.din) {
+            int hlen = din.readInt();
+            byte chunkType = din.readByte();
+            long readTime = System.currentTimeMillis();
+            long intervalMillis = readTime - lastReadTime;
 
-            case NGConstants.CHUNKTYPE_STDIN_EOF:
-                readEof();
-                break;
+            // Synchronize the remainder of the method on this object as it accesses internal state.
+            synchronized (this) {
+                lastReadTime = readTime;
+                switch(chunkType) {
+                    case NGConstants.CHUNKTYPE_STDIN:
+                        if (remaining != 0) throw new IOException("Data received before stdin stream was emptied.");
+                        remaining = hlen;
+                        stdin = readPayload(in, hlen);
+                        notify();
+                        break;
 
-            case NGConstants.CHUNKTYPE_HEARTBEAT:
-                for (Iterator i = heartbeatListeners.iterator(); i.hasNext();) {
-                    ((NGHeartbeatListener) i.next()).heartbeatReceived(intervalMillis);
+                    case NGConstants.CHUNKTYPE_STDIN_EOF:
+                        readEof();
+                        break;
+
+                    case NGConstants.CHUNKTYPE_HEARTBEAT:
+                        for (Iterator i = heartbeatListeners.iterator(); i.hasNext();) {
+                            ((NGHeartbeatListener) i.next()).heartbeatReceived(intervalMillis);
+                        }
+                        break;
+
+                    default:
+                        throw(new IOException("Unknown stream type: " + (char) chunkType));
                 }
-                break;
-
-            default:
-                throw(new IOException("Unknown stream type: " + (char) chunkType));
+            }
         }
     }
 
