@@ -580,11 +580,22 @@ char *shortClientName(char *s) {
  * @param s the program name to check
  */
 int isNailgunClientName(char *s) {
+  /* VMS can't get the command name from argv[0] when defined
+     as a foreign command, as the symbol is expanded. Aliases
+     are supported by defining a foreign command that includes
+     the class alias argument, e.g.
+         ng=="$path:[to]ng.exe"
+         alias==ng+" ""alias"""
+  */
+  #ifdef __VMS
+  return (1);
+  #else
   #ifdef WIN32
   return (!strcasecmp(s, NAILGUN_CLIENT_NAME) ||
            !strcasecmp(s, NAILGUN_CLIENT_NAME_EXE));
   #else
   return(!(strcmp(s, NAILGUN_CLIENT_NAME)));
+  #endif
   #endif
 }
 
