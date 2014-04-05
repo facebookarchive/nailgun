@@ -43,7 +43,9 @@ public class AliasManager {
 
         try {
             Properties props = new Properties();
-            props.load(getClass().getClassLoader().getResourceAsStream("com/martiansoftware/nailgun/builtins/builtins.properties"));
+            ClassLoader cl = getClass().getClassLoader();
+            if (cl == null) cl = ClassLoader.getSystemClassLoader(); // needed if nailgun classes are loaded in the boot classpath.
+            props.load(cl.getResourceAsStream("com/martiansoftware/nailgun/builtins/builtins.properties"));
             loadFromProperties(props);
         } catch (java.io.IOException e) {
             System.err.println("Unable to load builtins.properties: " + e.getMessage());
