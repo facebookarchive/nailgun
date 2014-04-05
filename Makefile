@@ -16,7 +16,7 @@ ng: ${SRCDIR}/ng.c
 	${CC} ${CFLAGS} -o ng ${SRCDIR}/ng.c
 
 install: ng
-	install ng /usr/local/bin
+	install ng /usr/local/bin/ng
 	
 ng.exe: ${SRCDIR}/ng.c
 	${WIN32_CC} -o ng.exe ${SRCDIR}/ng.c -lwsock32 -O3 ${CFLAGS}
