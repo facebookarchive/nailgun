@@ -441,6 +441,21 @@ public class NGServer implements Runnable {
         System.err.println("   or: java com.martiansoftware.nailgun.NGServer IPAddress:port timeout");
     }
 
+    public void addNGShutdownHook() {
+        Runtime.getRuntime().addShutdownHook(new NGServerShutdowner(this));
+    }
+
+    public void startThread() {
+        Thread t = new Thread(this);
+        t.setName("NGServer(" + addr + ", " + port + ")");
+        t.start();
+    }
+
+    public void start() {
+	startThread();
+	addNGShutdownHook();
+    }
+
     /**
      * Creates and starts a new
      * <code>NGServer</code>. A single optional argument is valid, specifying
@@ -496,11 +511,7 @@ public class NGServer implements Runnable {
         }
 
         NGServer server = new NGServer(serverAddress, port, DEFAULT_SESSIONPOOLSIZE, timeoutMillis);
-        Thread t = new Thread(server);
-        t.setName("NGServer(" + serverAddress + ", " + port + ")");
-        t.start();
-
-        Runtime.getRuntime().addShutdownHook(new NGServerShutdowner(server));
+        server.start();
 
         // if the port is 0, it will be automatically determined.
         // add this little wait so the ServerSocket can fully
