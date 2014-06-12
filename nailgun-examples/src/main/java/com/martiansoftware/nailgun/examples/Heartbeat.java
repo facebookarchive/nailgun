@@ -39,33 +39,30 @@ public class Heartbeat {
      * {@link com.martiansoftware.nailgun.NGClientListener}.
      */
 	public static void nailMain(final NGContext context) throws IOException {
+        try {
+            // Register a new NGClientListener. As clientDisconnected is called from
+            // another thread any nail state access must be properly synchronized.
+            context.addClientListener(new NGClientListener() {
+                public void clientDisconnected() throws InterruptedException {
+                    throw new InterruptedException("Client Disconnected"); // Will interrupt the thread below.
+                }
+            });
 
-        // Register a new NGClientListener. As clientDisconnected is called from
-        // another thread any nail state access must be properly synchronized.
-        context.addClientListener(new NGClientListener() {
-            public void clientDisconnected() throws InterruptedException {
-               throw new InterruptedException("Client Disconnected"); // Will interrupt the Thread.sleep() in the loop below.
-            }
-        });
-
-        // Register a new NGHeartbeatListener. This is normally only used for debugging disconnection problems.
-        context.addHeartbeatListener(new NGHeartbeatListener() {
+            // Register a new NGHeartbeatListener. This is normally only used for debugging disconnection problems.
+            context.addHeartbeatListener(new NGHeartbeatListener() {
             public void heartbeatReceived(long intervalMillis) {
                 context.out.print("H");
             }
         });
 
-        // Loop printing a hash to the client every second until client disconnects.
-        // Polling isClientConnected() ensures that the loop exits even when I/O is not interrupted by
-        // the InterruptedException thrown by clientDisconnected above.
-        try {
-            while(context.isClientConnected()) {
+            // Loop printing a hash to the client every second until client disconnects.
+            while(! Thread.currentThread().isInterrupted()) {
                 Thread.sleep(5000);
                 context.out.print("S");
             }
-        } catch (InterruptedException e) {
-        } finally {
+        } catch (InterruptedException ignored) {
             System.exit(42);
         }
+        System.exit(0);
 	}
 }

@@ -32,10 +32,7 @@ import java.util.concurrent.*;
  */
 public class NGInputStream extends FilterInputStream implements Closeable {
 
-    // An NGInputStream is required per NGSession and each NGInputStream requires one thread to loop reading chunks
-    // by executing Runnables on another thread with a timeout. So, the thread pool size needs to be twice the
-    // DEFAULT_SESSIONPOOL size.
-    private static final ExecutorService executor = Executors.newFixedThreadPool(NGServer.DEFAULT_SESSIONPOOLSIZE * 2);
+    private final ExecutorService executor;
     private final DataInputStream din;
     private InputStream stdin = null;
     private boolean eof = false;
@@ -58,11 +55,17 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      * @param serverLog the PrintStream to which server logging messages should be written
      * @param heartbeatTimeoutMillis the interval between heartbeats before considering the client disconnected
      */
-    public NGInputStream(InputStream in, DataOutputStream out, final PrintStream serverLog, final int heartbeatTimeoutMillis) {
+    public NGInputStream(
+            InputStream in,
+            DataOutputStream out,
+            final PrintStream serverLog,
+            final int heartbeatTimeoutMillis) {
         super(in);
         din = (DataInputStream) this.in;
         this.out = out;
         this.heartbeatTimeoutMillis = heartbeatTimeoutMillis;
+        final int threadCount = 2; // One to loop reading chunks by executing Runnables on a second with a timeout.
+        this.executor = Executors.newFixedThreadPool(threadCount);
 
         final Thread mainThread = Thread.currentThread();
         readFuture = executor.submit(new Runnable(){
@@ -97,6 +100,35 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     }
 
     /**
+     * Calls clientDisconnected method on given NGClientListener.
+     * If the clientDisconnected method throws an NGExitException due to calling System.exit() it is
+     * rethrown as an InterruptedException.
+     * @param listener The NGClientListener to notify.
+     */
+    private synchronized void notifyClientListener(NGClientListener listener) throws InterruptedException {
+        try {
+            listener.clientDisconnected();
+        } catch (NGExitException e) {
+            throw new InterruptedException(e.getMessage());
+        }
+    }
+
+    /**
+     * Calls clientDisconnected method on given NGClientListener.
+     * If the clientDisconnected method calls System.exit() or throws an InterruptedException, the given
+     * mainThread is interrupted.
+     * @param listener The NGClientListener to notify.
+     * @param mainThread The Thread to interrupt.
+     */
+    private synchronized void notifyClientListener(NGClientListener listener, Thread mainThread) {
+        try {
+            notifyClientListener(listener);
+        } catch (InterruptedException e) {
+            mainThread.interrupt();
+        }
+    }
+
+    /**
      * Calls clientDisconnected method on all registered NGClientListeners.
      * If any of the clientDisconnected methods throw an NGExitException due to calling System.exit()
      * clientDisconnected processing is halted, the exit status is printed to the serverLog and the main
@@ -105,23 +137,13 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      * @param mainThread The thread running nailMain which should be interrupted on System.exit()
      */
     private synchronized void notifyClientListeners(PrintStream serverLog, Thread mainThread) {
-        try {
-            if (! eof) {
-                for (Iterator i = clientListeners.iterator(); i.hasNext();) {
-                    ((NGClientListener) i.next()).clientDisconnected();
-                }
-                serverLog.println(mainThread.getName() + " disconnected");
+        if (! eof) {
+            serverLog.println(mainThread.getName() + " disconnected");
+            for (Iterator i = clientListeners.iterator(); i.hasNext(); ) {
+                notifyClientListener((NGClientListener) i.next(), mainThread);
             }
         }
-        catch (InterruptedException e) {
-            mainThread.interrupt();
-        }
-        catch (NGExitException e) {
-            mainThread.interrupt();
-        }
-        finally {
-            clientListeners.clear();
-        }
+        clientListeners.clear();
     }
 
     /**
@@ -130,6 +152,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     public synchronized void close() {
         readEof();
 		readFuture.cancel(true);
+        executor.shutdownNow();
 	}
 
     /**
@@ -283,11 +306,20 @@ public class NGInputStream extends FilterInputStream implements Closeable {
 	}
 
     /**
+     * Registers a new NGClientListener to be called on client disconnection or calls the listeners
+     * clientDisconnected method if the client has already disconnected to avoid races.
      * @param listener the {@link NGClientListener} to be notified of client events.
+     * @throws InterruptedException if thrown by the clientDisconnected method or it calls System.exit().
      */
     public synchronized void addClientListener(NGClientListener listener) {
         if (! readFuture.isDone()) {
             clientListeners.add(listener);
+        } else {
+            try {
+                notifyClientListener(listener);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
