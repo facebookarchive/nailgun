@@ -20,6 +20,7 @@ package com.martiansoftware.nailgun;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -91,6 +92,10 @@ public class NGSession extends Thread {
      */
     public static volatile ClassLoader classLoader = null; // initialized in the static initializer - see below
 
+    private InputStream systemIn;
+    private OutputStream systemOut;
+    private PrintStream systemErr;
+
     static {
         // initialize the signatures
         mainSignature = new Class[1];
@@ -114,7 +119,7 @@ public class NGSession extends Thread {
      * @param sessionPool The NGSessionPool we're working for
      * @param server The NGServer we're working for
      */
-    NGSession(NGSessionPool sessionPool, NGServer server) {
+    NGSession(NGSessionPool sessionPool, NGServer server, InputStream in, OutputStream out, PrintStream err) {
         super();
         this.sessionPool = sessionPool;
         this.server = server;
@@ -123,6 +128,10 @@ public class NGSession extends Thread {
         synchronized (sharedLock) {
             this.instanceNumber = ++instanceCounter;
         }
+
+        this.systemIn = in;
+        this.systemOut = out;
+        this.systemErr = err;
 //		server.out.println("Created NGSession " + instanceNumber);
     }
 
@@ -248,9 +257,17 @@ public class NGSession extends Thread {
                 PrintStream exit = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_EXIT));
 
                 // ThreadLocal streams for System.in/out/err redirection
-                ((ThreadLocalInputStream) System.in).init(in);
-                ((ThreadLocalPrintStream) System.out).init(out);
-                ((ThreadLocalPrintStream) System.err).init(err);
+                synchronized (System.in) {
+                    if (!(System.in instanceof ThreadLocalInputStream)) {
+                        System.setIn(new ThreadLocalInputStream(in));
+                        System.setOut(new ThreadLocalPrintStream(out));
+                        System.setErr(new ThreadLocalPrintStream(err));
+                    } else {
+                        ((ThreadLocalInputStream) System.in).init(in);
+                        ((ThreadLocalPrintStream) System.out).init(out);
+                        ((ThreadLocalPrintStream) System.err).init(err);
+                    }
+                }
 
                 try {
                     Alias alias = server.getAliasManager().getAlias(command);
@@ -351,10 +368,17 @@ public class NGSession extends Thread {
                 t.printStackTrace();
             }
 
-            ((ThreadLocalInputStream) System.in).init(null);
-            ((ThreadLocalPrintStream) System.out).init(null);
-            ((ThreadLocalPrintStream) System.err).init(null);
-
+            synchronized (System.in) {
+                if (!(System.in instanceof ThreadLocalInputStream)) {
+                    System.setIn(new ThreadLocalInputStream(systemIn));
+                    System.setOut(new ThreadLocalPrintStream((PrintStream) systemOut));
+                    System.setErr(new ThreadLocalPrintStream(systemErr));
+                } else {
+                    ((ThreadLocalInputStream) System.in).init(null);
+                    ((ThreadLocalPrintStream) System.out).init(null);
+                    ((ThreadLocalPrintStream) System.err).init(null);
+                }
+            }
             updateThreadName(null);
             sessionPool.give(this);
             socket = nextSocket();
