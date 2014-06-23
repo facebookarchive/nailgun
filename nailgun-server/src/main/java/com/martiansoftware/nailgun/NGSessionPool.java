@@ -18,6 +18,10 @@
 
 package com.martiansoftware.nailgun;
 
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
+
 /**
  * Provides NGSession pooling functionality.  One parameter, "maxIdle",
  * governs its behavior by setting the maximum number of idle NGSession
@@ -59,6 +63,21 @@ class NGSessionPool {
 	 */
 	private Object lock = new Object();
 	
+    /**
+     * <code>System.out</code> at the time of the NGSessionPool's creation
+     */
+    public final PrintStream out = System.out;
+
+    /**
+     * <code>System.err</code> at the time of the NGSessionPool's creation
+     */
+    public final PrintStream err = System.err;
+
+    /**
+     * <code>System.in</code> at the time of the NGSessionPool's creation
+     */
+    public final InputStream in = System.in;
+
 	/**
 	 * Creates a new NGSessionRunner operating for the specified server, with
 	 * the specified number of threads
@@ -81,7 +100,7 @@ class NGSessionPool {
 		NGSession result;
 		synchronized(lock) {
 			if (poolEntries == 0) {
-				result = new NGSession(this, server);
+				result = new NGSession(this, server, in, out, err);
 				result.start();
 			} else {
 				--poolEntries;
