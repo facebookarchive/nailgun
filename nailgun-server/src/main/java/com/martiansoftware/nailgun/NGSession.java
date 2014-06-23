@@ -20,6 +20,7 @@ package com.martiansoftware.nailgun;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.InputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -345,10 +346,11 @@ public class NGSession extends Thread {
                 }
 
                 sockout.flush();
-                socket.close();
 
             } catch (Throwable t) {
                 t.printStackTrace();
+            } finally {
+                closeQuietly(socket);
             }
 
             ((ThreadLocalInputStream) System.in).init(null);
@@ -368,5 +370,21 @@ public class NGSession extends Thread {
      */
     private void updateThreadName(String detail) {
         setName("NGSession " + instanceNumber + ": " + ((detail == null) ? "(idle)" : detail));
+    }
+
+    /**
+     * Close the socket and ignore any exceptions.
+     *
+     * @param socket the socket (connected to a client) to process
+     */
+    private static void closeQuietly(Socket socket) {
+        if (socket == null){
+            return;
+        }
+        try {
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
