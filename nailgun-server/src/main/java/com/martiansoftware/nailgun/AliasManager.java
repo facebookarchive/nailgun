@@ -17,6 +17,7 @@
  */
 package com.martiansoftware.nailgun;
 
+import java.io.InputStream;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
@@ -41,14 +42,17 @@ public class AliasManager {
     public AliasManager() {
         aliases = new java.util.HashMap();
 
+        Properties props = new Properties();
+        ClassLoader cl = getClass().getClassLoader();
+        if (cl == null) cl = ClassLoader.getSystemClassLoader(); // needed if nailgun classes are loaded in the boot classpath.
+        InputStream is = cl.getResourceAsStream("com/martiansoftware/nailgun/builtins/builtins.properties");
         try {
-            Properties props = new Properties();
-            ClassLoader cl = getClass().getClassLoader();
-            if (cl == null) cl = ClassLoader.getSystemClassLoader(); // needed if nailgun classes are loaded in the boot classpath.
-            props.load(cl.getResourceAsStream("com/martiansoftware/nailgun/builtins/builtins.properties"));
+            props.load(is);
             loadFromProperties(props);
         } catch (java.io.IOException e) {
             System.err.println("Unable to load builtins.properties: " + e.getMessage());
+        } finally {
+            Utils.closeQuietly(is);
         }
     }
 
