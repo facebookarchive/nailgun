@@ -18,6 +18,7 @@
 
 package com.martiansoftware.nailgun;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 
 /**
@@ -44,7 +45,7 @@ class NGOutputStream extends java.io.DataOutputStream {
 	 * stream (i.e., '1' for stdout, '2' for stderr).
 	 */
 	public NGOutputStream(java.io.OutputStream out, byte streamCode) {
-		super(out);
+		super(new BufferedOutputStream(out));
         this.lock = out;
         this.streamCode = streamCode;
 	}
