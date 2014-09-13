@@ -1,4 +1,4 @@
-/*   
+/*
 
  Copyright 2004-2012, Martian Software, Inc.
 
@@ -25,6 +25,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.Iterator;
+import java.util.logging.Logger;
 import java.util.Map;
 
 import com.martiansoftware.nailgun.builtins.DefaultNail;
@@ -46,73 +47,75 @@ public class NGServer implements Runnable {
      * Default size for thread pool
      */
     public static final int DEFAULT_SESSIONPOOLSIZE = 10;
-    
+
+    private static final Logger LOGGER = Logger.getLogger("NGServer");
+
     /**
      * The address on which to listen, or null to listen on all local addresses
      */
     private InetAddress addr = null;
-    
+
     /**
      * The port on which to listen, or zero to select a port automatically
      */
     private int port = 0;
-    
+
     /**
      * The socket doing the listening
      */
     private ServerSocket serversocket;
-    
+
     /**
      * True if this NGServer has received instructions to shut down
      */
     private boolean shutdown = false;
-    
+
     /**
      * True if this NGServer has been started and is accepting connections
      */
     private boolean running = false;
-    
+
     /**
      * This NGServer's AliasManager, which maps aliases to classes
      */
     private AliasManager aliasManager;
-    
+
     /**
      * If true, fully-qualified classnames are valid commands
      */
     private boolean allowNailsByClassName = true;
-    
+
     /**
      * The default class to use if an invalid alias or classname is specified by
      * the client.
      */
     private Class defaultNailClass = null;
-    
+
     /**
      * A pool of NGSessions ready to handle client connections
      */
     private NGSessionPool sessionPool = null;
-    
+
     /**
      * <code>System.out</code> at the time of the NGServer's creation
      */
     public final PrintStream out = System.out;
-    
+
     /**
      * <code>System.err</code> at the time of the NGServer's creation
      */
     public final PrintStream err = System.err;
-    
+
     /**
      * <code>System.in</code> at the time of the NGServer's creation
      */
     public final InputStream in = System.in;
-    
+
     /**
      * a collection of all classes executed by this server so far
      */
     private Map allNailStats = null;
-    
+
     /**
      * Remember the security manager we start with so we can restore it later
      */
@@ -320,17 +323,23 @@ public class NGServer implements Runnable {
             shutdown = true;
         }
 
+        LOGGER.fine("Shutting down nailgun server.");
         try {
             serversocket.close();
+            LOGGER.fine("Closed server socket.");
         } catch (Throwable toDiscard) {
+            LOGGER.warning("Error closing server socket: " + toDiscard.getMessage());
         }
 
         sessionPool.shutdown();
+        LOGGER.fine("Shut down session pool.");
 
         Class[] argTypes = new Class[1];
         argTypes[0] = NGServer.class;
         Object[] argValues = new Object[1];
         argValues[0] = this;
+
+        LOGGER.fine("Creating nailstats...");
 
         // make sure that all aliased classes have associated nailstats
         // so they can be shut down.
@@ -348,12 +357,16 @@ public class NGServer implements Runnable {
                 // to handle the case of no nailShutdown method.
                 try {
                     Method nailShutdown = nailClass.getMethod("nailShutdown", argTypes);
+                    LOGGER.fine("Calling nailShutdown() method on " + nailClass.getName());
                     nailShutdown.invoke(null, argValues);
+                    LOGGER.fine(nailClass.getName() + ".nailShutdown() exited cleanly.");
                 } catch (Throwable toDiscard) {
+                    LOGGER.warning("Error calling nailShutdown() on " + nailClass.getName());
                 }
             }
         }
 
+        LOGGER.fine("Restoring system streams...");
         // restore system streams
         System.setIn(in);
         System.setOut(out);
@@ -362,6 +375,7 @@ public class NGServer implements Runnable {
         System.setSecurityManager(originalSecurityManager);
 
         if (exitVM) {
+            LOGGER.fine("Exiting VM.");
             System.exit(0);
         }
     }
