@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Martian Software, Inc.
 
@@ -23,14 +23,18 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A FilterInputStream that is able to read the chunked stdin stream
  * from a NailGun client.
- * 
+ *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class NGInputStream extends FilterInputStream implements Closeable {
+
+    private static final Logger LOGGER = Logger.getLogger(NGInputStream.class.toString());
 
     private final ExecutorService executor;
     private final DataInputStream din;
@@ -88,8 +92,11 @@ public class NGInputStream extends FilterInputStream implements Closeable {
                         readHeaderFuture.get(heartbeatTimeoutMillis, TimeUnit.MILLISECONDS);
                     }
                 } catch (InterruptedException e) {
+                    LOGGER.log(Level.WARNING, "Got an InterruptedException - ignoring.", e);
                 } catch (ExecutionException e) {
+                    LOGGER.log(Level.WARNING, "Got an ExecutionException - ignoring.", e);
                 } catch (TimeoutException e) {
+                    LOGGER.log(Level.WARNING, "Got an ExecutionException - ignoring.", e);
                 } finally {
                     notifyClientListeners(serverLog, mainThread);
                     readEof();
@@ -124,6 +131,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
         try {
             notifyClientListener(listener);
         } catch (InterruptedException e) {
+            LOGGER.fine("notifyClientListener(): interrupting the main thread.");
             mainThread.interrupt();
         }
     }

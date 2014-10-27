@@ -1,4 +1,4 @@
-/*   
+/*
 
  Copyright 2004-2012, Martian Software, Inc.
 
@@ -26,6 +26,8 @@ import java.lang.reflect.Method;
 import java.net.Socket;
 import java.util.List;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Reads the NailGun stream from the client through the command, then hands off
@@ -35,6 +37,8 @@ import java.util.Properties;
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class NGSession extends Thread {
+
+    private static final Logger LOGGER = Logger.getLogger(NGSession.class.toString());
 
     /**
      * The server this NGSession is working for
@@ -98,13 +102,13 @@ public class NGSession extends Thread {
 
         nailMainSignature = new Class[1];
         nailMainSignature[0] = NGContext.class;
-        
+
         try {
             classLoader = NGSession.class.getClassLoader();
         } catch (SecurityException e) {
             throw e;
         }
-        
+
     }
 
     /**
@@ -210,30 +214,34 @@ public class NGSession extends Thread {
                         case NGConstants.CHUNKTYPE_ARGUMENT:
                             //	command line argument
                             remoteArgs.add(line);
+                            LOGGER.fine("Received command line argument: " + line);
                             break;
 
                         case NGConstants.CHUNKTYPE_ENVIRONMENT:
                             //	parse environment into property
                             int equalsIndex = line.indexOf('=');
                             if (equalsIndex > 0) {
-                                remoteEnv.setProperty(
-                                        line.substring(0, equalsIndex),
-                                        line.substring(equalsIndex + 1));
+                                String key = line.substring(0, equalsIndex);
+                                String value = line.substring(equalsIndex + 1);
+                                remoteEnv.setProperty(key, value);
+                                LOGGER.finest("Setting env: key('" + key + "')=value('" + value + "').");
                             }
-                            String key = line.substring(0, equalsIndex);
                             break;
 
                         case NGConstants.CHUNKTYPE_COMMAND:
                             // 	command (alias or classname)
                             command = line;
+                            LOGGER.fine("Received command: " + command);
                             break;
 
                         case NGConstants.CHUNKTYPE_WORKINGDIRECTORY:
                             //	client working directory
                             cwd = line;
+                            LOGGER.fine("Working directory: " + cwd);
                             break;
 
                         default:	// freakout?
+                            LOGGER.warning("Unknown chunk type: " + chunkType);
                     }
                 }
 
@@ -270,7 +278,7 @@ public class NGSession extends Thread {
                     boolean isStaticNail = true; // See: NonStaticNail.java
 
                     Class[] interfaces = cmdclass.getInterfaces();
-                    
+
                     for (int i = 0; i < interfaces.length; i++){
                         if (interfaces[i].equals(NonStaticNail.class)){
                             isStaticNail = false; break;
@@ -278,12 +286,12 @@ public class NGSession extends Thread {
                     }
 
                     if (!isStaticNail){
-                        
+
                         mainMethod = cmdclass.getMethod("nailMain", new Class[]{ String[].class });
                         methodArgs[0] = cmdlineArgs;
-                        
+
                     } else {
-                        
+
                         try {
                             mainMethod = cmdclass.getMethod("nailMain", nailMainSignature);
                             NGContext context = new NGContext();
@@ -307,10 +315,12 @@ public class NGSession extends Thread {
                             mainMethod = cmdclass.getMethod("main", mainSignature);
                             methodArgs[0] = cmdlineArgs;
                         }
-        
+
                     }
-                    
+
                     if (mainMethod != null) {
+                        LOGGER.fine("Invoking main method: " + mainMethod);
+
                         server.nailStarted(cmdclass);
                         NGSecurityManager.setExit(exit);
 
@@ -325,7 +335,7 @@ public class NGSession extends Thread {
                         } catch (InstantiationException e){
                             throw (e);
                         } catch (IllegalAccessException e){
-                            throw (e);  
+                            throw (e);
                         } catch (Throwable t) {
                             throw (t);
                         } finally {
@@ -348,6 +358,7 @@ public class NGSession extends Thread {
                 socket.close();
 
             } catch (Throwable t) {
+                LOGGER.log(Level.SEVERE, "Something bad happened: ", t);
                 t.printStackTrace();
             }
 
