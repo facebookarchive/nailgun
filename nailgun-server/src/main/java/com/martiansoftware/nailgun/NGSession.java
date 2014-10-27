@@ -224,7 +224,7 @@ public class NGSession extends Thread {
                                 String key = line.substring(0, equalsIndex);
                                 String value = line.substring(equalsIndex + 1);
                                 remoteEnv.setProperty(key, value);
-                                LOGGER.fine("Setting env: key('" + key + "')=value('" + value + "').");
+                                LOGGER.finest("Setting env: key('" + key + "')=value('" + value + "').");
                             }
                             break;
 
