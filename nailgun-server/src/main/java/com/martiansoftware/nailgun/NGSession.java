@@ -344,8 +344,11 @@ public class NGSession extends Thread {
                     exit.println(NGConstants.EXIT_EXCEPTION); // remote exception constant
                 }
 
+                out.flush();
+                err.flush();
+                exit.flush();
                 sockout.flush();
-                socket.close();
+                socket.shutdownOutput();
 
             } catch (Throwable t) {
                 t.printStackTrace();
