@@ -203,7 +203,7 @@ public class NGSession extends Thread {
 
                     byte[] b = new byte[(int) bytesToRead];
                     sockin.readFully(b);
-                    String line = new String(b, "US-ASCII");
+                    String line = new String(b, "UTF-8");
 
                     switch (chunkType) {
 
@@ -242,113 +242,129 @@ public class NGSession extends Thread {
                 // can't create NGInputStream until we've received a command, because at
                 // that point the stream from the client will only include stdin and stdin-eof
                 // chunks
-                InputStream in = new NGInputStream(sockin, sockout, server.out, heartbeatTimeoutMillis);
-                PrintStream out = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDOUT));
-                PrintStream err = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDERR));
-                PrintStream exit = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_EXIT));
-
-                // ThreadLocal streams for System.in/out/err redirection
-                ((ThreadLocalInputStream) System.in).init(in);
-                ((ThreadLocalPrintStream) System.out).init(out);
-                ((ThreadLocalPrintStream) System.err).init(err);
+                InputStream in = null;
+                PrintStream out = null;
+                PrintStream err = null;
+                PrintStream exit = null;
 
                 try {
-                    Alias alias = server.getAliasManager().getAlias(command);
-                    Class cmdclass = null;
-                    if (alias != null) {
-                        cmdclass = alias.getAliasedClass();
-                    } else if (server.allowsNailsByClassName()) {
-                        cmdclass = Class.forName(command, true, classLoader);
-                    } else {
-                        cmdclass = server.getDefaultNailClass();
-                    }
+                    in = new NGInputStream(sockin, sockout, server.out, heartbeatTimeoutMillis);
+                    out = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDOUT));
+                    err = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDERR));
+                    exit = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_EXIT));
 
-                    Object[] methodArgs = new Object[1];
-                    Method mainMethod = null; // will be either main(String[]) or nailMain(NGContext)
-                    String[] cmdlineArgs = (String[]) remoteArgs.toArray(new String[remoteArgs.size()]);
+                    // ThreadLocal streams for System.in/out/err redirection
+                    ((ThreadLocalInputStream) System.in).init(in);
+                    ((ThreadLocalPrintStream) System.out).init(out);
+                    ((ThreadLocalPrintStream) System.err).init(err);
 
-                    boolean isStaticNail = true; // See: NonStaticNail.java
-
-                    Class[] interfaces = cmdclass.getInterfaces();
-                    
-                    for (int i = 0; i < interfaces.length; i++){
-                        if (interfaces[i].equals(NonStaticNail.class)){
-                            isStaticNail = false; break;
-                        }
-                    }
-
-                    if (!isStaticNail){
-                        
-                        mainMethod = cmdclass.getMethod("nailMain", new Class[]{ String[].class });
-                        methodArgs[0] = cmdlineArgs;
-                        
-                    } else {
-                        
-                        try {
-                            mainMethod = cmdclass.getMethod("nailMain", nailMainSignature);
-                            NGContext context = new NGContext();
-                            context.setArgs(cmdlineArgs);
-                            context.in = in;
-                            context.out = out;
-                            context.err = err;
-                            context.setCommand(command);
-                            context.setExitStream(exit);
-                            context.setNGServer(server);
-                            context.setEnv(remoteEnv);
-                            context.setInetAddress(socket.getInetAddress());
-                            context.setPort(socket.getPort());
-                            context.setWorkingDirectory(cwd);
-                            methodArgs[0] = context;
-                        } catch (NoSuchMethodException toDiscard) {
-                            // that's ok - we'll just try main(String[]) next.
+                    try {
+                        Alias alias = server.getAliasManager().getAlias(command);
+                        Class cmdclass = null;
+                        if (alias != null) {
+                            cmdclass = alias.getAliasedClass();
+                        } else if (server.allowsNailsByClassName()) {
+                            cmdclass = Class.forName(command, true, classLoader);
+                        } else {
+                            cmdclass = server.getDefaultNailClass();
                         }
 
-                        if (mainMethod == null) {
-                            mainMethod = cmdclass.getMethod("main", mainSignature);
-                            methodArgs[0] = cmdlineArgs;
-                        }
-        
-                    }
-                    
-                    if (mainMethod != null) {
-                        server.nailStarted(cmdclass);
-                        NGSecurityManager.setExit(exit);
+                        Object[] methodArgs = new Object[1];
+                        Method mainMethod = null; // will be either main(String[]) or nailMain(NGContext)
+                        String[] cmdlineArgs = (String[]) remoteArgs.toArray(new String[remoteArgs.size()]);
 
-                        try {
-                            if (isStaticNail){
-                                mainMethod.invoke(null, methodArgs);
-                            } else {
-                                mainMethod.invoke(cmdclass.newInstance(), methodArgs);
+                        boolean isStaticNail = true; // See: NonStaticNail.java
+
+                        Class[] interfaces = cmdclass.getInterfaces();
+
+                        for (int i = 0; i < interfaces.length; i++){
+                            if (interfaces[i].equals(NonStaticNail.class)){
+                                isStaticNail = false; break;
                             }
-                        } catch (InvocationTargetException ite) {
-                            throw (ite.getCause());
-                        } catch (InstantiationException e){
-                            throw (e);
-                        } catch (IllegalAccessException e){
-                            throw (e);  
-                        } catch (Throwable t) {
-                            throw (t);
-                        } finally {
-                            server.nailFinished(cmdclass);
                         }
-                        exit.println(0);
+
+                        if (!isStaticNail){
+
+                            mainMethod = cmdclass.getMethod("nailMain", new Class[]{ String[].class });
+                            methodArgs[0] = cmdlineArgs;
+
+                        } else {
+
+                            try {
+                                mainMethod = cmdclass.getMethod("nailMain", nailMainSignature);
+                                NGContext context = new NGContext();
+                                context.setArgs(cmdlineArgs);
+                                context.in = in;
+                                context.out = out;
+                                context.err = err;
+                                context.setCommand(command);
+                                context.setExitStream(exit);
+                                context.setNGServer(server);
+                                context.setEnv(remoteEnv);
+                                context.setInetAddress(socket.getInetAddress());
+                                context.setPort(socket.getPort());
+                                context.setWorkingDirectory(cwd);
+                                methodArgs[0] = context;
+                            } catch (NoSuchMethodException toDiscard) {
+                                // that's ok - we'll just try main(String[]) next.
+                            }
+
+                            if (mainMethod == null) {
+                                mainMethod = cmdclass.getMethod("main", mainSignature);
+                                methodArgs[0] = cmdlineArgs;
+                            }
+
+                        }
+
+                        if (mainMethod != null) {
+                            server.nailStarted(cmdclass);
+                            NGSecurityManager.setExit(exit);
+
+                            try {
+                                if (isStaticNail){
+                                    mainMethod.invoke(null, methodArgs);
+                                } else {
+                                    mainMethod.invoke(cmdclass.newInstance(), methodArgs);
+                                }
+                            } catch (InvocationTargetException ite) {
+                                throw (ite.getCause());
+                            } catch (InstantiationException e){
+                                throw (e);
+                            } catch (IllegalAccessException e){
+                                throw (e);
+                            } catch (Throwable t) {
+                                throw (t);
+                            } finally {
+                                server.nailFinished(cmdclass);
+                            }
+                            exit.println(0);
+                        }
+
+                    } catch (NGExitException exitEx) {
+                        in.close();
+                        exit.println(exitEx.getStatus());
+                        server.out.println(Thread.currentThread().getName() + " exited with status " + exitEx.getStatus());
+                    } catch (Throwable t) {
+                        in.close();
+                        t.printStackTrace();
+                        exit.println(NGConstants.EXIT_EXCEPTION); // remote exception constant
                     }
-
-                } catch (NGExitException exitEx) {
-                    in.close();
-                    exit.println(exitEx.getStatus());
-                    server.out.println(Thread.currentThread().getName() + " exited with status " + exitEx.getStatus());
-                } catch (Throwable t) {
-                    in.close();
-                    t.printStackTrace();
-                    exit.println(NGConstants.EXIT_EXCEPTION); // remote exception constant
+                } finally {
+                    if (in != null) {
+                        in.close();
+                    }
+                    if (out != null) {
+                        out.close();
+                    }
+                    if (err != null) {
+                        err.close();
+                    }
+                    if (exit != null) {
+                        exit.close();
+                    }
+                    sockout.flush();
+                    socket.shutdownOutput();
                 }
-
-                out.flush();
-                err.flush();
-                exit.flush();
-                sockout.flush();
-                socket.shutdownOutput();
 
             } catch (Throwable t) {
                 t.printStackTrace();
