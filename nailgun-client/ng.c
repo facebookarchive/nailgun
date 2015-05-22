@@ -59,6 +59,12 @@
 	typedef unsigned int SOCKET;
 #endif
 
+#ifdef __APPLE__
+  #define SEND_FLAGS 0
+#else
+  #define SEND_FLAGS MSG_NOSIGNAL
+#endif
+
 #ifndef MIN
 #define MIN(a,b) ((a<b)?(a):(b))
 #endif
@@ -194,9 +200,9 @@ int sendAll(SOCKET s, char *buf, int len) {
   int total = 0;      
   int bytesleft = len; 
   int n = 0;
-    
+
   while(total < len) {
-    n = send(s, buf+total, bytesleft, MSG_NOSIGNAL);
+    n = send(s, buf+total, bytesleft, SEND_FLAGS);
     
     if (n == -1) { 
       break;
