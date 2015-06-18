@@ -23,7 +23,7 @@ package com.martiansoftware.nailgun;
  * 
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
-class NGSessionPool {
+class NGSessionCreator {
 
 	/**
 	 * reference to server we're working for
@@ -40,12 +40,12 @@ class NGSessionPool {
 	 * the specified number of threads
 	 * @param server the server to work for
 	 */
-	NGSessionPool(NGServer server) {
+	NGSessionCreator(NGServer server) {
 		this.server = server;
 	}
 
 	/**
-	 * Returns an NGSession from the pool, or creates one if necessary
+	 * Returns a new NGSession
 	 * @return an NGSession ready to work
 	 */
 	NGSession take() {
@@ -58,9 +58,8 @@ class NGSessionPool {
 	}
 	
 	/**
-	 * Returns an NGSession to the pool.  The pool may choose to shutdown
-	 * the thread if the pool is full
-	 * @param session the NGSession to return to the pool
+	 * Returns an NGSession to the creator.  The creator calls shutdown immediately
+	 * @param session the NGSession to shutdown
 	 */
 	void give(NGSession session) {
 		session.shutdown();
