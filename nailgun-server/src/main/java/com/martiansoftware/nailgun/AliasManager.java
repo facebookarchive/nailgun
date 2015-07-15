@@ -1,20 +1,19 @@
-/*   
+/*
+  Copyright 2004-2012, Martian Software, Inc.
 
- Copyright 2004-2012, Martian Software, Inc.
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
 
- http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-
- */
 package com.martiansoftware.nailgun;
 
 import java.util.Iterator;
@@ -29,7 +28,6 @@ import java.util.Set;
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class AliasManager {
-
     /**
      * actual alias storage
      */
@@ -44,7 +42,9 @@ public class AliasManager {
         try {
             Properties props = new Properties();
             ClassLoader cl = getClass().getClassLoader();
-            if (cl == null) cl = ClassLoader.getSystemClassLoader(); // needed if nailgun classes are loaded in the boot classpath.
+            if (cl == null) {
+                cl = ClassLoader.getSystemClassLoader();    // needed if nailgun classes are loaded in the boot classpath.
+            }
             props.load(cl.getResourceAsStream("com/martiansoftware/nailgun/builtins/builtins.properties"));
             loadFromProperties(props);
         } catch (java.io.IOException e) {

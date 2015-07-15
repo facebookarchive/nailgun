@@ -1,20 +1,19 @@
-/*   
+/*
+  Copyright 2004-2012, Martian Software, Inc.
 
- Copyright 2004-2012, Martian Software, Inc.
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
 
- http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-
- */
 package com.martiansoftware.nailgun;
 
 import java.io.InputStream;
@@ -41,78 +40,77 @@ import java.util.Properties;
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class NGServer implements Runnable {
-
     /**
      * Default size for thread pool
      */
     public static final int DEFAULT_SESSIONPOOLSIZE = 10;
-    
+
     /**
      * The address on which to listen, or null to listen on all local addresses
      */
     private InetAddress addr = null;
-    
+
     /**
      * The port on which to listen, or zero to select a port automatically
      */
     private int port = 0;
-    
+
     /**
      * The socket doing the listening
      */
     private ServerSocket serversocket;
-    
+
     /**
      * True if this NGServer has received instructions to shut down
      */
     private boolean shutdown = false;
-    
+
     /**
      * True if this NGServer has been started and is accepting connections
      */
     private boolean running = false;
-    
+
     /**
      * This NGServer's AliasManager, which maps aliases to classes
      */
     private AliasManager aliasManager;
-    
+
     /**
      * If true, fully-qualified classnames are valid commands
      */
     private boolean allowNailsByClassName = true;
-    
+
     /**
      * The default class to use if an invalid alias or classname is specified by
      * the client.
      */
     private Class defaultNailClass = null;
-    
+
     /**
      * A pool of NGSessions ready to handle client connections
      */
     private NGSessionPool sessionPool = null;
-    
+
     /**
      * <code>System.out</code> at the time of the NGServer's creation
      */
     public final PrintStream out = System.out;
-    
+
     /**
      * <code>System.err</code> at the time of the NGServer's creation
      */
     public final PrintStream err = System.err;
-    
+
     /**
      * <code>System.in</code> at the time of the NGServer's creation
      */
     public final InputStream in = System.in;
-    
+
     /**
      * a collection of all classes executed by this server so far
      */
     private Map allNailStats = null;
-    
+
     /**
      * Remember the security manager we start with so we can restore it later
      */
@@ -394,7 +392,7 @@ public class NGServer implements Runnable {
 
         originalSecurityManager = System.getSecurityManager();
         System.setSecurityManager(
-                new NGSecurityManager(
+            new NGSecurityManager(
                 originalSecurityManager));
 
 
@@ -453,7 +451,6 @@ public class NGServer implements Runnable {
      * @throws NumberFormatException if a non-numeric port is specified
      */
     public static void main(String[] args) throws NumberFormatException, UnknownHostException {
-
         if (args.length > 2) {
             usage();
             return;
@@ -515,14 +512,14 @@ public class NGServer implements Runnable {
         }
 
         System.out.println("NGServer "
-                + NGConstants.VERSION
-                + " started on "
-                + ((serverAddress == null)
-                ? "all interfaces"
-                : serverAddress.getHostAddress())
-                + ", port "
-                + runningPort
-                + ".");
+                           + NGConstants.VERSION
+                           + " started on "
+                           + ((serverAddress == null)
+                              ? "all interfaces"
+                              : serverAddress.getHostAddress())
+                           + ", port "
+                           + runningPort
+                           + ".");
     }
 
     public int getHeartbeatTimeout() {
@@ -537,7 +534,6 @@ public class NGServer implements Runnable {
      * Lamb</a>
      */
     private static class NGServerShutdowner extends Thread {
-
         private NGServer server = null;
 
         NGServerShutdowner(NGServer server) {
@@ -545,7 +541,6 @@ public class NGServer implements Runnable {
         }
 
         public void run() {
-
             int count = 0;
             server.shutdown(false);
 
@@ -553,7 +548,6 @@ public class NGServer implements Runnable {
             // remember that the shutdown will call nailShutdown in any
             // nails as well
             while (server.isRunning() && (count < 50)) {
-
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException e) {

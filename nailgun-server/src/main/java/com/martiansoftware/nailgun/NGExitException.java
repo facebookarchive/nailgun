@@ -1,8 +1,8 @@
 /*
  * This class is based upon org.apache.tools.ant.ExitException and is
  * subject to the following:
- * 
- * 
+ *
+ *
  * The Apache Software License, Version 1.1
  *
  * Copyright (c) 2001-2003 The Apache Software Foundation.  All rights
@@ -65,7 +65,6 @@ import java.io.PrintStream;
  * @author Pete Kirkham
  */
 public class NGExitException extends SecurityException {
-
     /**
      * Status code
      */
