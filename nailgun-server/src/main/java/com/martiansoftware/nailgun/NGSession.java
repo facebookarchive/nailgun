@@ -1,20 +1,19 @@
-/*   
+/*
+  Copyright 2004-2012, Martian Software, Inc.
 
- Copyright 2004-2012, Martian Software, Inc.
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
 
- http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-
- */
 package com.martiansoftware.nailgun;
 
 import java.io.DataInputStream;
@@ -35,7 +34,6 @@ import java.util.Properties;
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class NGSession extends Thread {
-
     /**
      * The server this NGSession is working for
      */
@@ -98,13 +96,13 @@ public class NGSession extends Thread {
 
         nailMainSignature = new Class[1];
         nailMainSignature[0] = NGContext.class;
-        
+
         try {
             classLoader = NGSession.class.getClassLoader();
         } catch (SecurityException e) {
             throw e;
         }
-        
+
     }
 
     /**
@@ -180,7 +178,6 @@ public class NGSession extends Thread {
      * nail for the socket, and loops until shut down.
      */
     public void run() {
-
         updateThreadName(null);
 
         Socket socket = nextSocket();
@@ -206,34 +203,33 @@ public class NGSession extends Thread {
                     String line = new String(b, "UTF-8");
 
                     switch (chunkType) {
+                    case NGConstants.CHUNKTYPE_ARGUMENT:
+                        //	command line argument
+                        remoteArgs.add(line);
+                        break;
 
-                        case NGConstants.CHUNKTYPE_ARGUMENT:
-                            //	command line argument
-                            remoteArgs.add(line);
-                            break;
+                    case NGConstants.CHUNKTYPE_ENVIRONMENT:
+                        //	parse environment into property
+                        int equalsIndex = line.indexOf('=');
+                        if (equalsIndex > 0) {
+                            remoteEnv.setProperty(
+                                line.substring(0, equalsIndex),
+                                line.substring(equalsIndex + 1));
+                        }
+                        String key = line.substring(0, equalsIndex);
+                        break;
 
-                        case NGConstants.CHUNKTYPE_ENVIRONMENT:
-                            //	parse environment into property
-                            int equalsIndex = line.indexOf('=');
-                            if (equalsIndex > 0) {
-                                remoteEnv.setProperty(
-                                        line.substring(0, equalsIndex),
-                                        line.substring(equalsIndex + 1));
-                            }
-                            String key = line.substring(0, equalsIndex);
-                            break;
+                    case NGConstants.CHUNKTYPE_COMMAND:
+                        // 	command (alias or classname)
+                        command = line;
+                        break;
 
-                        case NGConstants.CHUNKTYPE_COMMAND:
-                            // 	command (alias or classname)
-                            command = line;
-                            break;
+                    case NGConstants.CHUNKTYPE_WORKINGDIRECTORY:
+                        //	client working directory
+                        cwd = line;
+                        break;
 
-                        case NGConstants.CHUNKTYPE_WORKINGDIRECTORY:
-                            //	client working directory
-                            cwd = line;
-                            break;
-
-                        default:	// freakout?
+                    default:	// freakout?
                     }
                 }
 
@@ -277,19 +273,18 @@ public class NGSession extends Thread {
 
                         Class[] interfaces = cmdclass.getInterfaces();
 
-                        for (int i = 0; i < interfaces.length; i++){
-                            if (interfaces[i].equals(NonStaticNail.class)){
-                                isStaticNail = false; break;
+                        for (int i = 0; i < interfaces.length; i++) {
+                            if (interfaces[i].equals(NonStaticNail.class)) {
+                                isStaticNail = false;
+                                break;
                             }
                         }
 
-                        if (!isStaticNail){
-
-                            mainMethod = cmdclass.getMethod("nailMain", new Class[]{ String[].class });
+                        if (!isStaticNail) {
+                            mainMethod = cmdclass.getMethod("nailMain", new Class[] { String[].class });
                             methodArgs[0] = cmdlineArgs;
 
                         } else {
-
                             try {
                                 mainMethod = cmdclass.getMethod("nailMain", nailMainSignature);
                                 NGContext context = new NGContext();
@@ -321,19 +316,19 @@ public class NGSession extends Thread {
                             NGSecurityManager.setExit(exit);
 
                             try {
-                                if (isStaticNail){
+                                if (isStaticNail) {
                                     mainMethod.invoke(null, methodArgs);
                                 } else {
                                     mainMethod.invoke(cmdclass.newInstance(), methodArgs);
                                 }
                             } catch (InvocationTargetException ite) {
-                                throw (ite.getCause());
-                            } catch (InstantiationException e){
-                                throw (e);
-                            } catch (IllegalAccessException e){
-                                throw (e);
+                                throw(ite.getCause());
+                            } catch (InstantiationException e) {
+                                throw(e);
+                            } catch (IllegalAccessException e) {
+                                throw(e);
                             } catch (Throwable t) {
-                                throw (t);
+                                throw(t);
                             } finally {
                                 server.nailFinished(cmdclass);
                             }

@@ -1,5 +1,4 @@
-/*   
-
+/*
   Copyright 2004-2012, Martian Software, Inc.
 
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,6 @@
   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   See the License for the specific language governing permissions and
   limitations under the License.
-
 */
 
 package com.martiansoftware.nailgun;
@@ -27,20 +25,19 @@ import java.io.PrintStream;
  * being local to the current Thread.  By setting System.out to a
  * ThreadLocalPrintStream, different Threads can write to different
  * PrintStreams simply by using System.out.  Of course, the init()
- * method must be called by the Thread that wishes to use the 
+ * method must be called by the Thread that wishes to use the
  * wrapped stream.
- *  
+ *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 class ThreadLocalPrintStream extends PrintStream {
-
     /**
      * The PrintStreams for the various threads
      */
     private InheritableThreadLocal streams = null;
 
     private PrintStream defaultPrintStream = null;
-    
+
     /**
      * Creates a new InheritedThreadLocalPrintStream
      * @param defaultPrintStream the PrintStream that will be used if the
@@ -66,8 +63,8 @@ class ThreadLocalPrintStream extends PrintStream {
      * @return this thread's PrintStream
      */
     PrintStream getPrintStream() {
-    	PrintStream result = (PrintStream) streams.get();
-    	return ((result == null) ? defaultPrintStream : result);
+        PrintStream result = (PrintStream) streams.get();
+        return ((result == null) ? defaultPrintStream : result);
     }
 
 //  BEGIN delegated java.io.PrintStream methods
