@@ -6,14 +6,24 @@
 # Your compiler location may vary.
 WIN32_CC=/usr/bin/i586-mingw32msvc-gcc
 
+OS:=$(shell uname -s)
 CC?=gcc
+STRIP?=strip
 CFLAGS=-Wall -pedantic -s -O3
 SRCDIR=nailgun-client
 PREFIX?=/usr/local
 
+# OSX options, compile 32/64bit binary targetting OS X 10.6 Snow Leopard
+ifeq ($(OS),Darwin)
+CFLAGS=-Wall -pedantic -Os -arch i386 -arch x86_64 -mmacosx-version-min=10.6
+endif
+
 ng: ${SRCDIR}/ng.c
 	@echo "Building ng client.  To build a Windows binary, type 'make ng.exe'"
 	${CC} ${CFLAGS} -o ng ${SRCDIR}/ng.c
+ifeq ($(OS),Darwin)
+	${STRIP} ng
+endif
 
 install: ng
 	install -d ${PREFIX}/bin
