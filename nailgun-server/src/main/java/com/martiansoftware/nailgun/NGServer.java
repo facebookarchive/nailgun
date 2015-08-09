@@ -266,7 +266,10 @@ public class NGServer implements Runnable {
      * @param nailClass the nail class that finished
      */
     void nailFinished(Class nailClass) {
-        NailStats stats = (NailStats) allNailStats.get(nailClass);
+        NailStats stats;
+        synchronized (allNailStats) {
+            stats = (NailStats) allNailStats.get(nailClass);
+        }
         stats.nailFinished();
     }
 
