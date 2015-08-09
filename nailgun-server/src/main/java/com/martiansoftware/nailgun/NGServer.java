@@ -60,7 +60,7 @@ public class NGServer implements Runnable {
     /**
      * The socket doing the listening
      */
-    private ServerSocket serversocket;
+    private volatile ServerSocket serversocket;
     
     /**
      * True if this NGServer has received instructions to shut down
