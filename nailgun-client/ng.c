@@ -244,7 +244,7 @@ void sendChunk(unsigned int size, char chunkType, char* buf) {
   bytesSent = sendAll(nailgunsocket, header, CHUNK_HEADER_LEN);
   if (bytesSent != 0 && size > 0) {
     bytesSent = sendAll(nailgunsocket, buf, size);
-  } else if (bytesSent == 0 && (chunkType != CHUNKTYPE_HEARTBEAT || errno != EPIPE)) {
+  } else if (bytesSent == 0 && (chunkType != CHUNKTYPE_HEARTBEAT || !(errno == EPIPE || errno == ECONNRESET))) {
     perror("send");
     handleSocketClose();
   }
