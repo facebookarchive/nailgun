@@ -113,8 +113,8 @@ class NGSessionPool {
 	 * Shuts down the pool.  Running nails are allowed to finish.
 	 */
 	void shutdown() {
-		done = true;
 		synchronized(lock) {
+			done = true;
 			while (poolEntries > 0) {
 				take().shutdown();
 			}
