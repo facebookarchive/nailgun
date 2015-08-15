@@ -30,7 +30,7 @@ import java.util.Properties;
 /**
  * Reads the NailGun stream from the client through the command, then hands off
  * processing to the appropriate class. The NGSession obtains its sockets from
- * an NGSessionPool, which created this NGSession.
+ * an NGSessionCreator, which created this NGSession.
  *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
@@ -41,9 +41,9 @@ public class NGSession extends Thread {
      */
     private NGServer server = null;
     /**
-     * The pool this NGSession came from, and to which it will return itself
+     * The creator this NGSession came from, and which will shut it down
      */
-    private NGSessionPool sessionPool = null;
+    private NGSessionCreator sessionCreator = null;
     /**
      * Synchronization object
      */
@@ -108,15 +108,15 @@ public class NGSession extends Thread {
     }
 
     /**
-     * Creates a new NGSession running for the specified NGSessionPool and
+     * Creates a new NGSession running for the specified NGSessionCreator and
      * NGServer.
      *
-     * @param sessionPool The NGSessionPool we're working for
+     * @param sessionCreator The NGSessionCreator we're working for
      * @param server The NGServer we're working for
      */
-    NGSession(NGSessionPool sessionPool, NGServer server) {
+    NGSession(NGSessionCreator sessionCreator, NGServer server) {
         super();
-        this.sessionPool = sessionPool;
+        this.sessionCreator = sessionCreator;
         this.server = server;
         this.heartbeatTimeoutMillis = server.getHeartbeatTimeout();
 
@@ -139,7 +139,7 @@ public class NGSession extends Thread {
 
     /**
      * Instructs this NGSession to process the specified socket, after which
-     * this NGSession will return itself to the pool from which it came.
+     * this NGSession will shut itsef down.
      *
      * @param socket the socket (connected to a client) to process
      */
@@ -375,7 +375,7 @@ public class NGSession extends Thread {
             ((ThreadLocalPrintStream) System.err).init(null);
 
             updateThreadName(null);
-            sessionPool.give(this);
+            sessionCreator.give(this);
             socket = nextSocket();
         }
 

@@ -43,11 +43,6 @@ import java.util.Properties;
 public class NGServer implements Runnable {
 
     /**
-     * Default size for thread pool
-     */
-    public static final int DEFAULT_SESSIONPOOLSIZE = 10;
-    
-    /**
      * The address on which to listen, or null to listen on all local addresses
      */
     private InetAddress addr = null;
@@ -89,9 +84,9 @@ public class NGServer implements Runnable {
     private Class defaultNailClass = null;
     
     /**
-     * A pool of NGSessions ready to handle client connections
+     * A source of NGSessions ready to handle client connections
      */
-    private NGSessionPool sessionPool = null;
+    private NGSessionCreator sessionCreator = null;
     
     /**
      * <code>System.out</code> at the time of the NGServer's creation
@@ -121,7 +116,7 @@ public class NGServer implements Runnable {
 
     /**
      * Creates a new NGServer that will listen at the specified address and on
-     * the specified port with the specified session pool size. This does
+     * the specified port. This does
      * <b>not</b> cause the server to start listening. To do so, create a new
      * <code>Thread</code> wrapping this
      * <code>NGServer</code> and start it.
@@ -129,16 +124,14 @@ public class NGServer implements Runnable {
      * @param addr the address at which to listen, or
      * <code>null</code> to bind to all local addresses
      * @param port the port on which to listen.
-     * @param sessionPoolSize the max number of idle sessions allowed by the
-     * pool
      */
-    public NGServer(InetAddress addr, int port, int sessionPoolSize, int timeoutMillis) {
-        init(addr, port, sessionPoolSize, timeoutMillis);
+    public NGServer(InetAddress addr, int port, int timeoutMillis) {
+        init(addr, port, timeoutMillis);
     }
 
     /**
      * Creates a new NGServer that will listen at the specified address and on
-     * the specified port with the default session pool size. This does
+     * the specified port. This does
      * <b>not</b> cause the server to start listening. To do so, create a new
      * <code>Thread</code> wrapping this
      * <code>NGServer</code> and start it.
@@ -148,7 +141,7 @@ public class NGServer implements Runnable {
      * @param port the port on which to listen.
      */
     public NGServer(InetAddress addr, int port) {
-        init(addr, port, DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
+        init(addr, port, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
     }
 
     /**
@@ -159,7 +152,7 @@ public class NGServer implements Runnable {
      * <code>NGServer</code> and start it.
      */
     public NGServer() {
-        init(null, NGConstants.DEFAULT_PORT, DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
+        init(null, NGConstants.DEFAULT_PORT, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
     }
 
     /**
@@ -167,10 +160,8 @@ public class NGServer implements Runnable {
      *
      * @param addr the InetAddress to bind to
      * @param port the port on which to listen
-     * @param sessionPoolSize the max number of idle sessions allowed by the
-     * pool
      */
-    private void init(InetAddress addr, int port, int sessionPoolSize, int timeoutMillis) {
+    private void init(InetAddress addr, int port, int timeoutMillis) {
         this.addr = addr;
         this.port = port;
 
@@ -178,7 +169,7 @@ public class NGServer implements Runnable {
         allNailStats = new java.util.HashMap();
         // allow a maximum of 10 idle threads.  probably too high a number
         // and definitely should be configurable in the future
-        sessionPool = new NGSessionPool(this, sessionPoolSize);
+        sessionCreator = new NGSessionCreator(this);
         this.heartbeatTimeoutMillis = timeoutMillis;
     }
 
@@ -325,8 +316,6 @@ public class NGServer implements Runnable {
         } catch (Throwable toDiscard) {
         }
 
-        sessionPool.shutdown();
-
         Class[] argTypes = new Class[1];
         argTypes[0] = NGServer.class;
         Object[] argValues = new Object[1];
@@ -414,7 +403,7 @@ public class NGServer implements Runnable {
             }
 
             while (!shutdown) {
-                sessionOnDeck = sessionPool.take();
+                sessionOnDeck = sessionCreator.take();
                 Socket socket = serversocket.accept();
                 sessionOnDeck.run(socket);
             }
@@ -495,7 +484,7 @@ public class NGServer implements Runnable {
             }
         }
 
-        NGServer server = new NGServer(serverAddress, port, DEFAULT_SESSIONPOOLSIZE, timeoutMillis);
+        NGServer server = new NGServer(serverAddress, port, timeoutMillis);
         Thread t = new Thread(server);
         t.setName("NGServer(" + serverAddress + ", " + port + ")");
         t.start();
