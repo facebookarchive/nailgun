@@ -48,14 +48,9 @@ public class NGServer implements Runnable {
     public static final int DEFAULT_SESSIONPOOLSIZE = 10;
     
     /**
-     * The address on which to listen, or null to listen on all local addresses
+     * The address on which to listen
      */
-    private InetAddress addr = null;
-    
-    /**
-     * The port on which to listen, or zero to select a port automatically
-     */
-    private int port = 0;
+    private NGListeningAddress listeningAddress = null;
     
     /**
      * The socket doing the listening
@@ -133,7 +128,7 @@ public class NGServer implements Runnable {
      * pool
      */
     public NGServer(InetAddress addr, int port, int sessionPoolSize, int timeoutMillis) {
-        init(addr, port, sessionPoolSize, timeoutMillis);
+        init(new NGListeningAddress(addr, port), sessionPoolSize, timeoutMillis);
     }
 
     /**
@@ -148,7 +143,7 @@ public class NGServer implements Runnable {
      * @param port the port on which to listen.
      */
     public NGServer(InetAddress addr, int port) {
-        init(addr, port, DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
+        init(new NGListeningAddress(addr, port), DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
     }
 
     /**
@@ -159,20 +154,36 @@ public class NGServer implements Runnable {
      * <code>NGServer</code> and start it.
      */
     public NGServer() {
-        init(null, NGConstants.DEFAULT_PORT, DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
+        init(new NGListeningAddress(null, NGConstants.DEFAULT_PORT), DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
+    }
+
+    /**
+     * Creates a new NGServer that will listen at the specified address and on
+     * the specified port with the specified session pool size. This does
+     * <b>not</b> cause the server to start listening. To do so, create a new
+     * <code>Thread</code> wrapping this
+     * <code>NGServer</code> and start it.
+     *
+     * @param listeningAddress the address at which to listen
+     * @param sessionPoolSize the max number of idle sessions allowed by the
+     * pool
+     * @param timeoutMillis timeout in millis to wait for a heartbeat from the client
+     * before disconnecting them
+     */
+    public NGServer(NGListeningAddress listeningAddress, int sessionPoolSize, int timeoutMillis) {
+        init(listeningAddress, sessionPoolSize, timeoutMillis);
     }
 
     /**
      * Sets up the NGServer internals
      *
-     * @param addr the InetAddress to bind to
+     * @param listeningAddress the address to bind to
      * @param port the port on which to listen
      * @param sessionPoolSize the max number of idle sessions allowed by the
      * pool
      */
-    private void init(InetAddress addr, int port, int sessionPoolSize, int timeoutMillis) {
-        this.addr = addr;
-        this.port = port;
+    private void init(NGListeningAddress listeningAddress, int sessionPoolSize, int timeoutMillis) {
+        this.listeningAddress = listeningAddress;
 
         this.aliasManager = new AliasManager();
         allNailStats = new java.util.HashMap();
@@ -381,7 +392,7 @@ public class NGServer implements Runnable {
      * @return the port on which this server is (or will be) listening.
      */
     public int getPort() {
-        return ((serversocket == null) ? port : serversocket.getLocalPort());
+        return ((serversocket == null) ? listeningAddress.getInetPort() : serversocket.getLocalPort());
     }
 
     /**
@@ -407,12 +418,15 @@ public class NGServer implements Runnable {
         }
 
         try {
-            if (addr == null) {
-                serversocket = new ServerSocket(port);
+            if (listeningAddress.isInetAddress()) {
+                if (listeningAddress.getInetAddress() == null) {
+                    serversocket = new ServerSocket(listeningAddress.getInetPort());
+                } else {
+                    serversocket = new ServerSocket(listeningAddress.getInetPort(), 0, listeningAddress.getInetAddress());
+                }
             } else {
-                serversocket = new ServerSocket(port, 0, addr);
+                serversocket = new NGUnixDomainServerSocket(listeningAddress.getLocalAddress());
             }
-
             while (!shutdown) {
                 sessionOnDeck = sessionPool.take();
                 Socket socket = serversocket.accept();
@@ -460,15 +474,15 @@ public class NGServer implements Runnable {
         }
 
         // null server address means bind to everything local
-        InetAddress serverAddress = null;
-        int port = NGConstants.DEFAULT_PORT;
+        NGListeningAddress listeningAddress;
         int timeoutMillis = NGConstants.HEARTBEAT_TIMEOUT_MILLIS;
-
 
         // parse the command line parameters, which
         // may be an inetaddress to bind to, a port number,
-        // or an inetaddress followed by a port, separated
-        // by a colon. if a second parameter is provided it
+        // an inetaddress followed by a port, separated
+        // by a colon, or the string "local:/path/to/socket"
+        // for a Unix domain socket or Windows named pipe.
+        // if a second parameter is provided it
         // is interpreted as the number of milliseconds to
         // wait between heartbeats before considering the
         // client to have disconnected.
@@ -484,24 +498,35 @@ public class NGServer implements Runnable {
             } else {
                 portPart = argParts[0];
             }
-            if (addrPart != null) {
-                serverAddress = InetAddress.getByName(addrPart);
-            }
-            if (portPart != null) {
-                port = Integer.parseInt(portPart);
+            if (addrPart.equals("local") && portPart != null) {
+                // Treat the port part as a path to a local Unix domain socket
+                // or Windows named pipe.
+                listeningAddress = new NGListeningAddress(portPart);
+            } else if (addrPart != null && portPart != null) {
+                listeningAddress = new NGListeningAddress(
+                    InetAddress.getByName(addrPart), Integer.parseInt(portPart));
+            } else if (addrPart != null && portPart == null) {
+                listeningAddress = new NGListeningAddress(
+                    InetAddress.getByName(addrPart), NGConstants.DEFAULT_PORT);
+            } else {
+                listeningAddress = new NGListeningAddress(null, Integer.parseInt(portPart));
             }
             if (args.length == 2) {
                 timeoutMillis = Integer.parseInt(args[1]);
             }
+        } else {
+            listeningAddress = new NGListeningAddress(null, NGConstants.DEFAULT_PORT);
         }
 
-        NGServer server = new NGServer(serverAddress, port, DEFAULT_SESSIONPOOLSIZE, timeoutMillis);
+        NGServer server = new NGServer(listeningAddress, DEFAULT_SESSIONPOOLSIZE, timeoutMillis);
         Thread t = new Thread(server);
-        t.setName("NGServer(" + serverAddress + ", " + port + ")");
+        t.setName("NGServer(" + listeningAddress.toString() + ")");
         t.start();
 
         Runtime.getRuntime().addShutdownHook(new NGServerShutdowner(server));
 
+        String portDescription;
+        if (listeningAddress.isInetAddress() && listeningAddress.getInetPort() == 0) {
         // if the port is 0, it will be automatically determined.
         // add this little wait so the ServerSocket can fully
         // initialize and we can see what port it chose.
@@ -513,15 +538,16 @@ public class NGServer implements Runnable {
             }
             runningPort = server.getPort();
         }
+            portDescription = ", port " + runningPort;
+        } else {
+            portDescription = "";
+        }
 
         System.out.println("NGServer "
                 + NGConstants.VERSION
                 + " started on "
-                + ((serverAddress == null)
-                ? "all interfaces"
-                : serverAddress.getHostAddress())
-                + ", port "
-                + runningPort
+                + listeningAddress.toString()
+                + portDescription
                 + ".");
     }
 
