@@ -237,7 +237,13 @@ public class NGSession extends Thread {
                     }
                 }
 
-                updateThreadName(socket.getInetAddress().getHostAddress() + ": " + command);
+                String threadName;
+                if (socket.getInetAddress() != null) {
+                    threadName = socket.getInetAddress().getHostAddress() + ": " + command;
+                } else {
+                    threadName = command;
+                }
+                updateThreadName(threadName);
 
                 // can't create NGInputStream until we've received a command, because at
                 // that point the stream from the client will only include stdin and stdin-eof
