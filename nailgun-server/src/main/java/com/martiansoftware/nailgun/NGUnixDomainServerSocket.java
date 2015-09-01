@@ -112,12 +112,14 @@ public class NGUnixDomainServerSocket extends ServerSocket {
     }
   }
 
-  public synchronized Socket accept() throws IOException {
-    if (!isBound) {
-      throw new IllegalStateException("Socket is not bound");
-    }
-    if (isClosed) {
-      throw new IllegalStateException("Socket is already closed");
+  public Socket accept() throws IOException {
+    synchronized (this) {
+      if (!isBound) {
+        throw new IllegalStateException("Socket is not bound");
+      }
+      if (isClosed) {
+        throw new IllegalStateException("Socket is already closed");
+      }
     }
     try {
       NGUnixDomainSocketLibrary.SockaddrUn sockaddrUn =
