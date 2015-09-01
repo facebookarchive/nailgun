@@ -666,7 +666,7 @@ int main(int argc, char *argv[], char *env[]) {
   struct hostent *hostinfo;
   char *cmd;
   int firstArgIndex;           /* the first argument _to pass to the server_ */
-  char isattybuf[] = NAILGUN_TTY_FORMAT;
+  char isattybuf[128];
 
   #ifndef WIN32
     fd_set readfds;
@@ -831,7 +831,7 @@ int main(int argc, char *argv[], char *env[]) {
 #ifndef WIN32
   /* notify isatty for standard pipes */
   for(i = 0; i < 3; i++) {
-    sprintf(isattybuf, NAILGUN_TTY_FORMAT, i, isatty(i));
+    snprintf(isattybuf, sizeof isattybuf - 1, NAILGUN_TTY_FORMAT, i, isatty(i));
     sendText(CHUNKTYPE_ENV, isattybuf);
   }
 #endif
