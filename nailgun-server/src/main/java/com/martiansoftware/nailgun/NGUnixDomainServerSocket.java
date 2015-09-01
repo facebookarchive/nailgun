@@ -166,9 +166,8 @@ public class NGUnixDomainServerSocket extends ServerSocket {
       throw new IllegalStateException("Socket is already closed");
     }
     try {
-      NGUnixDomainSocketLibrary.close(fd.get());
       // Ensure any pending call to accept() fails.
-      fd.set(-1);
+      NGUnixDomainSocketLibrary.close(fd.getAndSet(-1));
       isClosed = true;
     } catch (LastErrorException e) {
       throw new IOException(e);
