@@ -369,7 +369,7 @@ public class NGSession extends Thread {
                         exit.close();
                     }
                     sockout.flush();
-                    socket.close();
+                    socket.shutdownOutput();
                 }
 
             } catch (Throwable t) {
