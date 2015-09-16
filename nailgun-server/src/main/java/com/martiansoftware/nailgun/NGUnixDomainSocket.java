@@ -38,6 +38,7 @@ public class NGUnixDomainSocket extends Socket {
   private final int fd;
   private final InputStream is;
   private final OutputStream os;
+  private boolean isConnected = true;
 
   /**
    * Creates a Unix domain socket backed by a native file descriptor.
@@ -46,6 +47,10 @@ public class NGUnixDomainSocket extends Socket {
     this.fd = fd;
     this.is = new NGUnixDomainSocketInputStream(fd);
     this.os = new NGUnixDomainSocketOutputStream(fd);
+  }
+
+  public boolean isConnected() {
+    return isConnected;
   }
 
   public InputStream getInputStream() {
@@ -58,7 +63,9 @@ public class NGUnixDomainSocket extends Socket {
 
   public void close() throws IOException {
     try {
+      super.close();
       NGUnixDomainSocketLibrary.close(fd);
+      isConnected = false;
     } catch (LastErrorException e) {
       throw new IOException(e);
     }
