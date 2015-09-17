@@ -67,6 +67,12 @@ public class NGSecurityManager extends SecurityManager {
                         base.checkPermission(perm, context);
                 }
         }
+
+        public void checkRead(String file) {
+                if (base != null) {
+                        base.checkRead(file);
+                }
+        }
         
         public static void setExit (PrintStream exit) {
                 EXIT.set(exit);
