@@ -35,7 +35,7 @@ import java.net.Socket;
  * {@link Socket#getLocalSocketAddress()}, {@link Socket#getRemoteSocketAddress()}.
  */
 public class NGUnixDomainSocket extends Socket {
-  private final int fd;
+  private int fd;
   private final InputStream is;
   private final OutputStream os;
 
@@ -44,8 +44,8 @@ public class NGUnixDomainSocket extends Socket {
    */
   public NGUnixDomainSocket(int fd) {
     this.fd = fd;
-    this.is = new NGUnixDomainSocketInputStream(fd);
-    this.os = new NGUnixDomainSocketOutputStream(fd);
+    this.is = new NGUnixDomainSocketInputStream();
+    this.os = new NGUnixDomainSocketOutputStream();
   }
 
   public InputStream getInputStream() {
@@ -56,20 +56,25 @@ public class NGUnixDomainSocket extends Socket {
     return os;
   }
 
-  public void close() throws IOException {
+  public void shutdownOutput() throws IOException {
     try {
-      NGUnixDomainSocketLibrary.close(fd);
+      NGUnixDomainSocketLibrary.shutdown(fd, 1);
     } catch (LastErrorException e) {
       throw new IOException(e);
     }
   }
 
-  private static class NGUnixDomainSocketInputStream extends InputStream {
-    private final int fd;
-
-    public NGUnixDomainSocketInputStream(int fd) {
-      this.fd = fd;
+  public void close() throws IOException {
+    super.close();
+    try {
+      NGUnixDomainSocketLibrary.close(fd);
+      fd = -1;
+    } catch (LastErrorException e) {
+      throw new IOException(e);
     }
+  }
+
+  private class NGUnixDomainSocketInputStream extends InputStream {
 
     public int read() throws IOException {
       ByteBuffer buf = ByteBuffer.allocate(1);
@@ -105,12 +110,7 @@ public class NGUnixDomainSocket extends Socket {
     }
   }
 
-  private static class NGUnixDomainSocketOutputStream extends OutputStream {
-    private final int fd;
-
-    public NGUnixDomainSocketOutputStream(int fd) {
-      this.fd = fd;
-    }
+  private class NGUnixDomainSocketOutputStream extends OutputStream {
 
     public void write(int b) throws IOException {
       ByteBuffer buf = ByteBuffer.allocate(1);

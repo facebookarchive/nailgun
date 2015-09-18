@@ -17,14 +17,14 @@
  */
 package com.martiansoftware.nailgun;
 
+import com.sun.jna.LastErrorException;
+import com.sun.jna.ptr.IntByReference;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import com.sun.jna.LastErrorException;
-import com.sun.jna.ptr.IntByReference;
 
 /**
  * Implements a {@link ServerSocket} which binds to a local Unix domain socket
@@ -168,6 +168,7 @@ public class NGUnixDomainServerSocket extends ServerSocket {
     try {
       // Ensure any pending call to accept() fails.
       NGUnixDomainSocketLibrary.close(fd.getAndSet(-1));
+      super.close();
       isClosed = true;
     } catch (LastErrorException e) {
       throw new IOException(e);
