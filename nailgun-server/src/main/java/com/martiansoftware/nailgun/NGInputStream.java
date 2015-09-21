@@ -149,10 +149,20 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     /**
      * Cancels the thread reading from the NailGun client.
      */
-    public synchronized void close() {
-        readEof();
-		readFuture.cancel(true);
-        executor.shutdownNow();
+    public void close() {
+        synchronized (this) {
+            readEof();
+            readFuture.cancel(true);
+            executor.shutdownNow();
+        }
+        boolean shutdown = false;
+        while (!shutdown) {
+            try {
+                shutdown = executor.awaitTermination(1, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
 	}
 
     /**

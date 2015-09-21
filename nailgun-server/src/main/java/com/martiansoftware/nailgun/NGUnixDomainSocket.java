@@ -22,12 +22,8 @@ import com.sun.jna.LastErrorException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-
-import java.nio.ByteBuffer;
-
 import java.net.Socket;
-
-import java.util.concurrent.atomic.AtomicInteger;
+import java.nio.ByteBuffer;
 
 /**
  * Implements a {@link Socket} backed by a native Unix domain socket.
@@ -37,10 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * {@link Socket#getLocalSocketAddress()}, {@link Socket#getRemoteSocketAddress()}.
  */
 public class NGUnixDomainSocket extends Socket {
-  // We use an atomic integer in case the input or output stream
-  // outlasts the socket, so we make sure closing the fd is
-  // immediately reflected in the stream.
-  private final AtomicInteger fd;
+  private final int fd;
   private final InputStream is;
   private final OutputStream os;
 
@@ -48,7 +41,7 @@ public class NGUnixDomainSocket extends Socket {
    * Creates a Unix domain socket backed by a native file descriptor.
    */
   public NGUnixDomainSocket(int fd) {
-    this.fd = new AtomicInteger(fd);
+    this.fd = fd;
     this.is = new NGUnixDomainSocketInputStream();
     this.os = new NGUnixDomainSocketOutputStream();
   }
@@ -63,7 +56,7 @@ public class NGUnixDomainSocket extends Socket {
 
   public void shutdownOutput() throws IOException {
     try {
-      NGUnixDomainSocketLibrary.shutdown(fd.get(), 1);
+      NGUnixDomainSocketLibrary.shutdown(fd, 1);
     } catch (LastErrorException e) {
       throw new IOException(e);
     }
@@ -72,7 +65,7 @@ public class NGUnixDomainSocket extends Socket {
   public synchronized void close() throws IOException {
     super.close();
     try {
-      NGUnixDomainSocketLibrary.close(fd.getAndSet(-1));
+      NGUnixDomainSocketLibrary.close(fd);
     } catch (LastErrorException e) {
       throw new IOException(e);
     }
@@ -106,7 +99,7 @@ public class NGUnixDomainSocket extends Socket {
 
     private int doRead(ByteBuffer buf) throws IOException {
       try {
-        int ret = NGUnixDomainSocketLibrary.read(fd.get(), buf, buf.remaining());
+        int ret = NGUnixDomainSocketLibrary.read(fd, buf, buf.remaining());
         return ret;
       } catch (LastErrorException e) {
         throw new IOException(e);
@@ -132,7 +125,7 @@ public class NGUnixDomainSocket extends Socket {
 
     private void doWrite(ByteBuffer buf) throws IOException {
       try {
-        int ret = NGUnixDomainSocketLibrary.write(fd.get(), buf, buf.remaining());
+        int ret = NGUnixDomainSocketLibrary.write(fd, buf, buf.remaining());
         if (ret != buf.remaining()) {
           // This shouldn't happen with standard blocking Unix domain sockets.
           throw new IOException("Could not write " + buf.remaining() + " bytes as requested " +
