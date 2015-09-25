@@ -369,6 +369,8 @@ public class NGSession extends Thread {
                         exit.close();
                     }
                     sockout.flush();
+                    socket.shutdownInput();
+                    socket.shutdownOutput();
                     socket.close();
                 }
 

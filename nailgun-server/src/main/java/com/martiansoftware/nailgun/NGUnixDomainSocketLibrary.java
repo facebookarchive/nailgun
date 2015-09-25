@@ -17,18 +17,17 @@
  */
 package com.martiansoftware.nailgun;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-
-import java.util.Arrays;
-import java.util.List;
-
 import com.sun.jna.LastErrorException;
 import com.sun.jna.Native;
 import com.sun.jna.Platform;
-import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.Structure;
 import com.sun.jna.Union;
+import com.sun.jna.ptr.IntByReference;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Utility class to bridge native Unix domain socket calls to Java using JNA.
@@ -37,6 +36,9 @@ public class NGUnixDomainSocketLibrary {
   public static final int PF_LOCAL = 1;
   public static final int AF_LOCAL = 1;
   public static final int SOCK_STREAM = 1;
+
+  public static final int SHUT_RD = 0;
+  public static final int SHUT_WR = 1;
 
   // Utility class, do not instantiate.
   private NGUnixDomainSocketLibrary() { }
@@ -132,4 +134,5 @@ public class NGUnixDomainSocketLibrary {
   public static native int write(int fd, ByteBuffer buffer, int count)
     throws LastErrorException;
   public static native int close(int fd) throws LastErrorException;
+  public static native int shutdown(int fd, int how) throws LastErrorException;
 }

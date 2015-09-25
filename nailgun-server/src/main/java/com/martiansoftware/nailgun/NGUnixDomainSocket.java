@@ -35,7 +35,7 @@ import java.net.Socket;
  * {@link Socket#getLocalSocketAddress()}, {@link Socket#getRemoteSocketAddress()}.
  */
 public class NGUnixDomainSocket extends Socket {
-  private final int fd;
+  private final ReferenceCountedFileDescriptor fd;
   private final InputStream is;
   private final OutputStream os;
 
@@ -43,9 +43,9 @@ public class NGUnixDomainSocket extends Socket {
    * Creates a Unix domain socket backed by a native file descriptor.
    */
   public NGUnixDomainSocket(int fd) {
-    this.fd = fd;
-    this.is = new NGUnixDomainSocketInputStream(fd);
-    this.os = new NGUnixDomainSocketOutputStream(fd);
+    this.fd = new ReferenceCountedFileDescriptor(fd);
+    this.is = new NGUnixDomainSocketInputStream();
+    this.os = new NGUnixDomainSocketOutputStream();
   }
 
   public InputStream getInputStream() {
@@ -56,21 +56,42 @@ public class NGUnixDomainSocket extends Socket {
     return os;
   }
 
-  public void close() throws IOException {
+  public void shutdownInput() throws IOException {
+    doShutdown(NGUnixDomainSocketLibrary.SHUT_RD);
+  }
+
+  public void shutdownOutput() throws IOException {
+    doShutdown(NGUnixDomainSocketLibrary.SHUT_WR);
+  }
+
+  private void doShutdown(int how) throws IOException {
     try {
-      NGUnixDomainSocketLibrary.close(fd);
+      int socketFd = fd.acquire();
+      if (socketFd != -1) {
+        NGUnixDomainSocketLibrary.shutdown(socketFd, how);
+      }
+    } catch (LastErrorException e) {
+      throw new IOException(e);
+    } finally {
+      fd.release();
+    }
+  }
+
+  public void close() throws IOException {
+    super.close();
+    try {
+      // This might not close the FD right away. In case we are about
+      // to read or write on another thread, it will delay the close
+      // until the read or write completes, to prevent the FD from
+      // being re-used for a different purpose and the other thread
+      // reading from a different FD.
+      fd.close();
     } catch (LastErrorException e) {
       throw new IOException(e);
     }
   }
 
-  private static class NGUnixDomainSocketInputStream extends InputStream {
-    private final int fd;
-
-    public NGUnixDomainSocketInputStream(int fd) {
-      this.fd = fd;
-    }
-
+  private class NGUnixDomainSocketInputStream extends InputStream {
     public int read() throws IOException {
       ByteBuffer buf = ByteBuffer.allocate(1);
       int result;
@@ -97,20 +118,20 @@ public class NGUnixDomainSocket extends Socket {
 
     private int doRead(ByteBuffer buf) throws IOException {
       try {
-        int ret = NGUnixDomainSocketLibrary.read(fd, buf, buf.remaining());
-        return ret;
+        int fdToRead = fd.acquire();
+        if (fdToRead == -1) {
+          return -1;
+        }
+        return NGUnixDomainSocketLibrary.read(fdToRead, buf, buf.remaining());
       } catch (LastErrorException e) {
         throw new IOException(e);
+      } finally {
+        fd.release();
       }
     }
   }
 
-  private static class NGUnixDomainSocketOutputStream extends OutputStream {
-    private final int fd;
-
-    public NGUnixDomainSocketOutputStream(int fd) {
-      this.fd = fd;
-    }
+  private class NGUnixDomainSocketOutputStream extends OutputStream {
 
     public void write(int b) throws IOException {
       ByteBuffer buf = ByteBuffer.allocate(1);
@@ -128,7 +149,11 @@ public class NGUnixDomainSocket extends Socket {
 
     private void doWrite(ByteBuffer buf) throws IOException {
       try {
-        int ret = NGUnixDomainSocketLibrary.write(fd, buf, buf.remaining());
+        int fdToWrite = fd.acquire();
+        if (fdToWrite == -1) {
+          return;
+        }
+        int ret = NGUnixDomainSocketLibrary.write(fdToWrite, buf, buf.remaining());
         if (ret != buf.remaining()) {
           // This shouldn't happen with standard blocking Unix domain sockets.
           throw new IOException("Could not write " + buf.remaining() + " bytes as requested " +
@@ -136,6 +161,8 @@ public class NGUnixDomainSocket extends Socket {
         }
       } catch (LastErrorException e) {
         throw new IOException(e);
+      } finally {
+        fd.release();
       }
     }
   }
