@@ -1,18 +1,17 @@
-
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-	<parent>
-		<groupId>org.sonatype.oss</groupId>
-		<artifactId>oss-parent</artifactId>
-		<version>7</version>
-	</parent>
-	
+    <parent>
+        <groupId>org.sonatype.oss</groupId>
+        <artifactId>oss-parent</artifactId>
+        <version>7</version>
+    </parent>
+
     <groupId>com.martiansoftware</groupId>
     <artifactId>nailgun-all</artifactId>
     <version>0.9.2-SNAPSHOT</version>
     <packaging>pom</packaging>
-   
+
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <additionalparam>-Xdoclint:none</additionalparam>
@@ -20,11 +19,11 @@
 
     <name>nailgun-all</name>
     <description>
-        Nailgun is a client, protocol, and server for running Java programs 
-        from the command line without incurring the JVM startup overhead. 
-        Programs run in the server (which is implemented in Java), and are 
+        Nailgun is a client, protocol, and server for running Java programs
+        from the command line without incurring the JVM startup overhead.
+        Programs run in the server (which is implemented in Java), and are
         triggered by the client (written in C), which handles all I/O.
-    
+
         This project contains the server and examples.
     </description>
     <url>http://martiansoftware.com/nailgun</url>
@@ -35,14 +34,14 @@
             <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
             <distribution>repo</distribution>
         </license>
-    </licenses>    
+    </licenses>
 
     <scm>
         <url>scm:git:git@github.com:martylamb/nailgun.git</url>
         <connection>scm:git:git@github.com:martylamb/nailgun.git</connection>
         <developerConnection>scm:git:git@github.com:martylamb/nailgun.git</developerConnection>
       <tag>nailgun-all-0.9.1</tag>
-  </scm>
+    </scm>
 
     <developers>
         <developer>
@@ -51,12 +50,12 @@
             <url>http://martiansoftware.com</url>
         </developer>
     </developers>
-	
+
     <modules>
         <module>nailgun-server</module>
         <module>nailgun-examples</module>
     </modules>
-    
+
     <build>
         <plugins>
             <plugin>
@@ -64,8 +63,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.0</version>
                 <configuration>
-                    <source>1.4</source>
-                    <target>1.4</target>
+                    <source>1.8</source>
+                    <target>1.8</target>
                 </configuration>
             </plugin>
             <plugin>
@@ -80,7 +79,7 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin>        
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
@@ -104,7 +103,7 @@
             </plugin>
         </plugins>
     </build>
-    
+
     <distributionManagement>
         <snapshotRepository>
             <id>sonatype-nexus-snapshots</id>
@@ -118,37 +117,37 @@
         </repository>
     </distributionManagement>
 
-	<profiles>
-		<profile>
-			<id>release-sign-artifacts</id>
-			<activation>
-				<property>
-					<name>performRelease</name>
-					<value>true</value>
-				</property>
-			</activation>
-			<build>
-				<plugins>
-					<plugin>
-						<groupId>org.apache.maven.plugins</groupId>
-						<artifactId>maven-gpg-plugin</artifactId>
-						<version>1.4</version>
-						<configuration>
-							<passphrase>${gpg.passphrase}</passphrase>
-						</configuration>
-						<executions>
-							<execution>
-								<id>sign-artifacts</id>
-								<phase>verify</phase>
-								<goals>
-									<goal>sign</goal>
-								</goals>
-							</execution>
-						</executions>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
-	</profiles>
-   
+    <profiles>
+        <profile>
+            <id>release-sign-artifacts</id>
+            <activation>
+                <property>
+                    <name>performRelease</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.4</version>
+                        <configuration>
+                            <passphrase>${gpg.passphrase}</passphrase>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>
