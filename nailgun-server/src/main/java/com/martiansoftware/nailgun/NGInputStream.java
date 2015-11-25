@@ -23,6 +23,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A FilterInputStream that is able to read the chunked stdin stream
@@ -32,6 +34,7 @@ import java.util.concurrent.*;
  */
 public class NGInputStream extends FilterInputStream implements Closeable {
 
+    private static final Logger LOG = Logger.getLogger(NGInputStream.class.getName());
     private final ExecutorService executor;
     private final DataInputStream din;
     private InputStream stdin = null;
@@ -87,10 +90,14 @@ public class NGInputStream extends FilterInputStream implements Closeable {
                         });
                         readHeaderFuture.get(heartbeatTimeoutMillis, TimeUnit.MILLISECONDS);
                     }
-                } catch (InterruptedException e) {
-                } catch (ExecutionException e) {
-                } catch (TimeoutException e) {
-                } finally {
+		 } catch (InterruptedException e) {
+		    LOG.log(Level.WARNING, "Nailgun client read future was interrupted", e);
+		 } catch (ExecutionException e) {
+		    LOG.log(Level.WARNING, "Nailgun client read future raised an exception", e);
+		 } catch (TimeoutException e) {
+		    LOG.log(Level.WARNING, "Nailgun client read future timed out after " + heartbeatTimeoutMillis + " ms", e);
+		 } finally {
+                    LOG.log(Level.FINE, "Nailgun client read shutting down");
                     notifyClientListeners(serverLog, mainThread);
                     readEof();
                     Thread.currentThread().setName(Thread.currentThread().getName() + " (idle)");
@@ -199,22 +206,26 @@ public class NGInputStream extends FilterInputStream implements Closeable {
                 switch(chunkType) {
                     case NGConstants.CHUNKTYPE_STDIN:
                         if (remaining != 0) throw new IOException("Data received before stdin stream was emptied.");
+                        LOG.log(Level.FINE, "Got stdin chunk, len " + hlen);
                         remaining = hlen;
                         stdin = readPayload(in, hlen);
                         notify();
                         break;
 
                     case NGConstants.CHUNKTYPE_STDIN_EOF:
+                        LOG.log(Level.FINE, "Got stdin closed chunk");
                         readEof();
                         break;
 
                     case NGConstants.CHUNKTYPE_HEARTBEAT:
+                        LOG.log(Level.FINER, "Got client heartbeat");
                         for (Iterator i = heartbeatListeners.iterator(); i.hasNext();) {
                             ((NGHeartbeatListener) i.next()).heartbeatReceived(intervalMillis);
                         }
                         break;
 
                     default:
+                        LOG.log(Level.WARNING, "Unknown chunk type: " + (char) chunkType);
                         throw(new IOException("Unknown stream type: " + (char) chunkType));
                 }
             }
