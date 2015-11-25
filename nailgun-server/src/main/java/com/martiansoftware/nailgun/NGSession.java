@@ -19,6 +19,7 @@ package com.martiansoftware.nailgun;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
@@ -26,6 +27,8 @@ import java.lang.reflect.Method;
 import java.net.Socket;
 import java.util.List;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Reads the NailGun stream from the client through the command, then hands off
@@ -35,6 +38,8 @@ import java.util.Properties;
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class NGSession extends Thread {
+
+    private static final Logger LOG = Logger.getLogger(NGSession.class.getName());
 
     /**
      * The server this NGSession is working for
@@ -183,8 +188,10 @@ public class NGSession extends Thread {
 
         updateThreadName(null);
 
+        LOG.log(Level.FINE, "Waiting for first client to connect");
         Socket socket = nextSocket();
         while (socket != null) {
+            LOG.log(Level.FINE, "Client connected");
             try {
                 DataInputStream sockin = new DataInputStream(socket.getInputStream());
                 DataOutputStream sockout = new DataOutputStream(socket.getOutputStream());
@@ -347,15 +354,18 @@ public class NGSession extends Thread {
                         }
 
                     } catch (NGExitException exitEx) {
+                        LOG.log(Level.INFO, "Server cleanly exited with status " + exitEx.getStatus(), exitEx);
                         in.close();
                         exit.println(exitEx.getStatus());
                         server.out.println(Thread.currentThread().getName() + " exited with status " + exitEx.getStatus());
                     } catch (Throwable t) {
+                        LOG.log(Level.INFO, "Server unexpectedly exited with unhandled exception", t);
                         in.close();
                         t.printStackTrace();
                         exit.println(NGConstants.EXIT_EXCEPTION); // remote exception constant
                     }
                 } finally {
+                    LOG.log(Level.FINE, "Tearing down client socket");
                     if (in != null) {
                         in.close();
                     }
@@ -368,13 +378,24 @@ public class NGSession extends Thread {
                     if (exit != null) {
                         exit.close();
                     }
+                    LOG.log(Level.FINE, "Flushing client socket");
                     sockout.flush();
-                    socket.shutdownInput();
-                    socket.shutdownOutput();
+                    try {
+                        socket.shutdownInput();
+                        socket.shutdownOutput();
+                    } catch (IOException e) {
+                        LOG.log(
+                            Level.FINE,
+                            "Error shutting down socket I/O (this is expected if the client disconnected already)",
+                            e);
+                    }
+                    LOG.log(Level.FINE, "Closing client socket");
                     socket.close();
+                    LOG.log(Level.FINE, "Finished tearing down client socket");
                 }
 
             } catch (Throwable t) {
+                LOG.log(Level.WARNING, "Internal error in session", t);
                 t.printStackTrace();
             }
 
@@ -384,9 +405,11 @@ public class NGSession extends Thread {
 
             updateThreadName(null);
             sessionPool.give(this);
+            LOG.log(Level.FINE, "Waiting for next client to connect");
             socket = nextSocket();
         }
 
+        LOG.log(Level.INFO, "NGSession shutting down");
 //		server.out.println("Shutdown NGSession " + instanceNumber);
     }
 

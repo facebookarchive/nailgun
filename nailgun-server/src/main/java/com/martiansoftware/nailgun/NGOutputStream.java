@@ -89,6 +89,10 @@ class NGOutputStream extends java.io.DataOutputStream {
 	public void close() throws IOException {
 		throwIfClosed();
 		closed = true;
+		// Since we override DataOutputStream.close() but don't
+		// call super.close(), make sure to at least flush the stream
+		// so the last chunk written makes it to the client.
+		super.flush();
 	}
 
 	/**
