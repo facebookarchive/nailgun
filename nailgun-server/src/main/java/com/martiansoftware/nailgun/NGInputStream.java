@@ -23,6 +23,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A FilterInputStream that is able to read the chunked stdin stream
@@ -52,13 +54,13 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      * call registered NGClientListeners if a client disconnection is detected.
      * @param in the InputStream to wrap
      * @param out the OutputStream to which SENDINPUT chunks should be sent
-     * @param serverLog the PrintStream to which server logging messages should be written
+     * @param serverLog the {@linkplain Logger} the server uses for logging
      * @param heartbeatTimeoutMillis the interval between heartbeats before considering the client disconnected
      */
     public NGInputStream(
             InputStream in,
             DataOutputStream out,
-            final PrintStream serverLog,
+            final Logger serverLog,
             final int heartbeatTimeoutMillis) {
         super(in);
         din = (DataInputStream) this.in;
@@ -133,12 +135,12 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      * If any of the clientDisconnected methods throw an NGExitException due to calling System.exit()
      * clientDisconnected processing is halted, the exit status is printed to the serverLog and the main
      * thread is interrupted.
-     * @param serverLog The NailGun server log stream.
+     * @param serverLog The NailGun server logger.
      * @param mainThread The thread running nailMain which should be interrupted on System.exit()
      */
-    private synchronized void notifyClientListeners(PrintStream serverLog, Thread mainThread) {
+    private synchronized void notifyClientListeners(Logger serverLog, Thread mainThread) {
         if (! eof) {
-            serverLog.println(mainThread.getName() + " disconnected");
+            serverLog.log(Level.INFO, mainThread.getName() + " disconnected");
             for (Iterator i = clientListeners.iterator(); i.hasNext(); ) {
                 notifyClientListener((NGClientListener) i.next(), mainThread);
             }

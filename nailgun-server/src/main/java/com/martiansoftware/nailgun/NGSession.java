@@ -26,6 +26,8 @@ import java.lang.reflect.Method;
 import java.net.Socket;
 import java.util.List;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Reads the NailGun stream from the client through the command, then hands off
@@ -35,8 +37,13 @@ import java.util.Properties;
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class NGSession extends Thread {
-
-    /**
+	
+	/**
+	 * {@linkplain Logger} instance for this class.
+	 */
+	private static final Logger LOGGER = Logger.getLogger(NGServer.class.getName());
+	
+	/**
      * The server this NGSession is working for
      */
     private NGServer server = null;
@@ -254,7 +261,7 @@ public class NGSession extends Thread {
                 PrintStream exit = null;
 
                 try {
-                    in = new NGInputStream(sockin, sockout, server.out, heartbeatTimeoutMillis);
+                    in = new NGInputStream(sockin, sockout, server.getLogger(), heartbeatTimeoutMillis);
                     out = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDOUT));
                     err = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDERR));
                     exit = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_EXIT));
@@ -349,10 +356,11 @@ public class NGSession extends Thread {
                     } catch (NGExitException exitEx) {
                         in.close();
                         exit.println(exitEx.getStatus());
-                        server.out.println(Thread.currentThread().getName() + " exited with status " + exitEx.getStatus());
+                        server.getLogger().log(Level.INFO, Thread.currentThread().getName() + " exited with status " + exitEx.getStatus());
                     } catch (Throwable t) {
                         in.close();
-                        t.printStackTrace();
+                        // t.printStackTrace();
+                        LOGGER.log(Level.SEVERE, t.getMessage(), t);
                         exit.println(NGConstants.EXIT_EXCEPTION); // remote exception constant
                     }
                 } finally {
@@ -375,7 +383,8 @@ public class NGSession extends Thread {
                 }
 
             } catch (Throwable t) {
-                t.printStackTrace();
+                // t.printStackTrace();
+                LOGGER.log(Level.SEVERE, t.getMessage(), t);
             }
 
             ((ThreadLocalInputStream) System.in).init(null);
