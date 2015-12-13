@@ -678,7 +678,10 @@ int main(int argc, char *argv[], char *env[]) {
   struct hostent *hostinfo;
   char *cmd;
   int firstArgIndex;           /* the first argument _to pass to the server_ */
+
+  #ifndef WIN32
     char isattybuf[] = NAILGUN_TTY_FORMAT;
+  #endif
 
   #ifndef WIN32
     fd_set readfds;
