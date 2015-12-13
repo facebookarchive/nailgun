@@ -18,6 +18,8 @@
 package com.martiansoftware.nailgun;
 
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Just a simple holder for various NailGun-related contants.
@@ -26,6 +28,11 @@ import java.util.Properties;
  */
 public class NGConstants {
 
+	/**
+	 * {@linkplain Logger} instance for this class.
+	 */
+	private static final Logger LOGGER = Logger.getLogger(NGConstants.class.getName());
+	
     /**
      * The default NailGun port (2113)
      */
@@ -125,7 +132,7 @@ public class NGConstants {
         try {
             props.load(NGConstants.class.getResourceAsStream("/META-INF/maven/com.martiansoftware/nailgun-server/pom.properties"));
         } catch (Exception e) {
-            System.err.println("Unable to load nailgun-version.properties.");
+        	LOGGER.log(Level.SEVERE, "Unable to load nailgun-version.properties", e);
         }
         VERSION  = props.getProperty("version", "[UNKNOWN]");
     }

@@ -28,7 +28,9 @@ import java.util.Iterator;
 import java.util.Map;
 
 import com.martiansoftware.nailgun.builtins.DefaultNail;
-import java.util.Properties;
+
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * <p>Listens for new connections from NailGun clients and launches NGSession
@@ -42,6 +44,11 @@ import java.util.Properties;
  */
 public class NGServer implements Runnable {
 
+	/**
+	 * {@linkplain Logger} instance for this class.
+	 */
+	private static final Logger LOGGER = Logger.getLogger(NGServer.class.getName());
+	
     /**
      * Default size for thread pool
      */
@@ -427,20 +434,28 @@ public class NGServer implements Runnable {
             } else {
                 serversocket = new NGUnixDomainServerSocket(listeningAddress.getLocalAddress());
             }
-            while (!shutdown) {
-                sessionOnDeck = sessionPool.take();
-                Socket socket = serversocket.accept();
-                sessionOnDeck.run(socket);
-            }
-
         } catch (Throwable t) {
-            // if shutdown is called while the accept() method is blocking,
-            // an exception will be thrown that we don't care about.  filter
-            // those out.
-            if (!shutdown) {
-                t.printStackTrace();
-            }
+        	getLogger().log(Level.SEVERE, "Failed to create server socket", t);
         }
+        
+        if (serversocket != null) {
+        	LOGGER.log(Level.INFO, getStartMessage());
+	        try {
+	            while (!shutdown) {
+	                sessionOnDeck = sessionPool.take();
+	                Socket socket = serversocket.accept();
+	                sessionOnDeck.run(socket);
+	            }
+	        } catch (Throwable t) {
+	            // if shutdown is called while the accept() method is blocking,
+	            // an exception will be thrown that we don't care about.  filter
+	            // those out.
+	            if (!shutdown) {
+	            	getLogger().log(Level.SEVERE, t.getMessage(), t);
+	            }
+	        }
+        }
+        
         if (sessionOnDeck != null) {
             sessionOnDeck.shutdown();
         }
@@ -524,35 +539,30 @@ public class NGServer implements Runnable {
         t.start();
 
         Runtime.getRuntime().addShutdownHook(new NGServerShutdowner(server));
-
-        String portDescription;
-        if (listeningAddress.isInetAddress() && listeningAddress.getInetPort() == 0) {
-        // if the port is 0, it will be automatically determined.
-        // add this little wait so the ServerSocket can fully
-        // initialize and we can see what port it chose.
-        int runningPort = server.getPort();
-        while (runningPort == 0) {
-            try {
-                Thread.sleep(50);
-            } catch (Throwable toIgnore) {
-            }
-            runningPort = server.getPort();
-        }
-            portDescription = ", port " + runningPort;
-        } else {
-            portDescription = "";
-        }
-
-        System.out.println("NGServer "
-                + NGConstants.VERSION
-                + " started on "
-                + listeningAddress.toString()
-                + portDescription
-                + ".");
     }
 
     public int getHeartbeatTimeout() {
         return heartbeatTimeoutMillis;
+    }
+    
+    public Logger getLogger() {
+		return LOGGER;
+	}
+    
+	private String getStartMessage() {
+		return String.format("%s %s started on %s.", new Object[] {
+				getClass().getSimpleName(),
+				NGConstants.VERSION,
+				listeningAddress.toString()
+		});
+	}
+    
+    private String getStopMessage() {
+		return String.format("%s %s running on %s stopped.", new Object[] {
+				getClass().getSimpleName(),
+				NGConstants.VERSION,
+				listeningAddress.toString()
+		});
     }
 
     /**
@@ -564,10 +574,17 @@ public class NGServer implements Runnable {
      */
     private static class NGServerShutdowner extends Thread {
 
+    	/**
+    	 * {@linkplain Logger} instance for this class.
+    	 */
+    	private static final Logger LOGGER = Logger.getLogger(NGServerShutdowner.class.getName());
+    	
         private NGServer server = null;
+        private String stopMessage;
 
         NGServerShutdowner(NGServer server) {
             this.server = server;
+            this.stopMessage = server.getStopMessage();
         }
 
         public void run() {
@@ -588,9 +605,9 @@ public class NGServer implements Runnable {
             }
 
             if (server.isRunning()) {
-                System.err.println("Unable to cleanly shutdown server.  Exiting JVM Anyway.");
+                LOGGER.log(Level.WARNING, "Unable to cleanly shutdown server. Exiting JVM Anyway.");
             } else {
-                System.out.println("NGServer shut down.");
+                LOGGER.log(Level.INFO, stopMessage);
             }
         }
     }
