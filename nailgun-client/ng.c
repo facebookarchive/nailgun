@@ -60,6 +60,18 @@
 	typedef unsigned int SOCKET;
 #endif
 
+#ifndef MSG_NOSIGNAL /* MinGW */
+	#define MSG_NOSIGNAL    0x4000  /* Do not generate SIGPIPE */
+#endif
+
+#ifndef ECONNRESET /* MinGW */
+	#define ECONNRESET      104     /* Connection reset by peer */
+#endif
+
+#ifndef socklen_t /* MinGW + winsock */
+	typedef int socklen_t;
+#endif
+
 #ifdef __APPLE__
   #define SEND_FLAGS 0
 #else
@@ -666,7 +678,7 @@ int main(int argc, char *argv[], char *env[]) {
   struct hostent *hostinfo;
   char *cmd;
   int firstArgIndex;           /* the first argument _to pass to the server_ */
-  char isattybuf[] = NAILGUN_TTY_FORMAT;
+    char isattybuf[] = NAILGUN_TTY_FORMAT;
 
   #ifndef WIN32
     fd_set readfds;
