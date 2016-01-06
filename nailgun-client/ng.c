@@ -68,8 +68,9 @@
 	#define ECONNRESET      104     /* Connection reset by peer */
 #endif
 
-#ifndef socklen_t /* MinGW + winsock */
-	typedef int socklen_t;
+#ifndef __socklen_t_defined /* MinGW + winsock */
+  typedef int socklen_t;
+  #define __socklen_t_defined
 #endif
 
 #ifdef __APPLE__
