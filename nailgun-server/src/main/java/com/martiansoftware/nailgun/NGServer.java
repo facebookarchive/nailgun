@@ -491,7 +491,7 @@ public class NGServer implements Runnable {
             } else {
                 portPart = argParts[0];
             }
-            if (addrPart.equals("local") && portPart != null) {
+            if ("local".equals(addrPart) && portPart != null) {
                 // Treat the port part as a path to a local Unix domain socket
                 // or Windows named pipe.
                 listeningAddress = new NGListeningAddress(portPart);
