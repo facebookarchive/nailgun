@@ -28,6 +28,8 @@ import java.util.Iterator;
 import java.util.Map;
 
 import com.martiansoftware.nailgun.builtins.DefaultNail;
+import com.sun.jna.Platform;
+
 import java.util.Properties;
 
 /**
@@ -425,7 +427,11 @@ public class NGServer implements Runnable {
                     serversocket = new ServerSocket(listeningAddress.getInetPort(), 0, listeningAddress.getInetAddress());
                 }
             } else {
-                serversocket = new NGUnixDomainServerSocket(listeningAddress.getLocalAddress());
+                if (Platform.isWindows()) {
+                    serversocket = new NGWin32NamedPipeServerSocket(listeningAddress.getLocalAddress());
+                } else {
+                    serversocket = new NGUnixDomainServerSocket(listeningAddress.getLocalAddress());
+                }
             }
             while (!shutdown) {
                 sessionOnDeck = sessionPool.take();
