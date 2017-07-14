@@ -26,6 +26,7 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.martiansoftware.nailgun.builtins.DefaultNail;
 import com.sun.jna.Platform;
@@ -60,7 +61,7 @@ public class NGServer implements Runnable {
     /**
      * True if this NGServer has received instructions to shut down
      */
-    private boolean shutdown = false;
+    private final AtomicBoolean shutdown = new AtomicBoolean(false);
     
     /**
      * True if this NGServer has been started and is accepting connections
@@ -315,11 +316,8 @@ public class NGServer implements Runnable {
      * by your nails.
      */
     public void shutdown(boolean exitVM) {
-        synchronized (this) {
-            if (shutdown) {
-                return;
-            }
-            shutdown = true;
+        if (shutdown.getAndSet(true)) {
+            return;
         }
 
         try {
@@ -422,7 +420,7 @@ public class NGServer implements Runnable {
                     serversocket = new NGUnixDomainServerSocket(listeningAddress.getLocalAddress());
                 }
             }
-            while (!shutdown) {
+            while (!shutdown.get()) {
                 sessionOnDeck = sessionPool.take();
                 Socket socket = serversocket.accept();
                 sessionOnDeck.run(socket);
@@ -432,7 +430,7 @@ public class NGServer implements Runnable {
             // if shutdown is called while the accept() method is blocking,
             // an exception will be thrown that we don't care about.  filter
             // those out.
-            if (!shutdown) {
+            if (!shutdown.get()) {
                 t.printStackTrace();
             }
         }
