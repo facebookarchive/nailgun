@@ -45,15 +45,15 @@ public class NGSession extends Thread {
     /**
      * The server this NGSession is working for
      */
-    private NGServer server = null;
+    private final NGServer server;
     /**
      * The pool this NGSession came from, and to which it will return itself
      */
-    private NGSessionPool sessionPool = null;
+    private final NGSessionPool sessionPool;
     /**
      * Synchronization object
      */
-    private Object lock = new Object();
+    private final Object lock = new Object();
     /**
      * The next socket this NGSession has been tasked with processing (by
      * NGServer)
@@ -73,7 +73,7 @@ public class NGSession extends Thread {
     /**
      * The interval to wait between heartbeats before considering the client to have disconnected.
      */
-    private int heartbeatTimeoutMillis = NGConstants.HEARTBEAT_TIMEOUT_MILLIS;
+    private final int heartbeatTimeoutMillis;
 
     /**
      * The instance counter shared among all NGSessions
@@ -82,11 +82,15 @@ public class NGSession extends Thread {
     /**
      * signature of main(String[]) for reflection operations
      */
-    private static Class[] mainSignature;
+    private final static Class[] mainSignature = {
+            String[].class,
+    };
     /**
      * signature of nailMain(NGContext) for reflection operations
      */
-    private static Class[] nailMainSignature;
+    private final static Class[] nailMainSignature = {
+            NGContext.class,
+    };
 
     /**
      * A ClassLoader that may be set by a client. Defaults to the classloader of this class.
@@ -94,13 +98,6 @@ public class NGSession extends Thread {
     public static volatile ClassLoader classLoader = null; // initialized in the static initializer - see below
 
     static {
-        // initialize the signatures
-        mainSignature = new Class[1];
-        mainSignature[0] = String[].class;
-
-        nailMainSignature = new Class[1];
-        nailMainSignature[0] = NGContext.class;
-        
         try {
             classLoader = NGSession.class.getClassLoader();
         } catch (SecurityException e) {
@@ -129,8 +126,8 @@ public class NGSession extends Thread {
      * Shuts down this NGSession gracefully
      */
     void shutdown() {
-        done = true;
         synchronized (lock) {
+            done = true;
             nextSocket = null;
             lock.notifyAll();
         }
