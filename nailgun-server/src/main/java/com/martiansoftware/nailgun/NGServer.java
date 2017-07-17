@@ -30,8 +30,6 @@ import java.util.Map;
 import com.martiansoftware.nailgun.builtins.DefaultNail;
 import com.sun.jna.Platform;
 
-import java.util.Properties;
-
 /**
  * <p>Listens for new connections from NailGun clients and launches NGSession
  * threads to process them.</p>
@@ -52,7 +50,7 @@ public class NGServer implements Runnable {
     /**
      * The address on which to listen
      */
-    private NGListeningAddress listeningAddress = null;
+    private final NGListeningAddress listeningAddress;
     
     /**
      * The socket doing the listening
@@ -72,7 +70,7 @@ public class NGServer implements Runnable {
     /**
      * This NGServer's AliasManager, which maps aliases to classes
      */
-    private AliasManager aliasManager;
+    private final AliasManager aliasManager;
     
     /**
      * If true, fully-qualified classnames are valid commands
@@ -88,7 +86,7 @@ public class NGServer implements Runnable {
     /**
      * A pool of NGSessions ready to handle client connections
      */
-    private NGSessionPool sessionPool = null;
+    private final NGSessionPool sessionPool;
     
     /**
      * <code>System.out</code> at the time of the NGServer's creation
@@ -108,13 +106,13 @@ public class NGServer implements Runnable {
     /**
      * a collection of all classes executed by this server so far
      */
-    private Map allNailStats = null;
+    private final Map allNailStats;
     
     /**
      * Remember the security manager we start with so we can restore it later
      */
     private SecurityManager originalSecurityManager = null;
-    private int heartbeatTimeoutMillis = NGConstants.HEARTBEAT_TIMEOUT_MILLIS;
+    private final int heartbeatTimeoutMillis;
 
     /**
      * Creates a new NGServer that will listen at the specified address and on
@@ -130,7 +128,7 @@ public class NGServer implements Runnable {
      * pool
      */
     public NGServer(InetAddress addr, int port, int sessionPoolSize, int timeoutMillis) {
-        init(new NGListeningAddress(addr, port), sessionPoolSize, timeoutMillis);
+        this(new NGListeningAddress(addr, port), sessionPoolSize, timeoutMillis);
     }
 
     /**
@@ -145,7 +143,7 @@ public class NGServer implements Runnable {
      * @param port the port on which to listen.
      */
     public NGServer(InetAddress addr, int port) {
-        init(new NGListeningAddress(addr, port), DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
+        this(new NGListeningAddress(addr, port), DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
     }
 
     /**
@@ -156,7 +154,7 @@ public class NGServer implements Runnable {
      * <code>NGServer</code> and start it.
      */
     public NGServer() {
-        init(new NGListeningAddress(null, NGConstants.DEFAULT_PORT), DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
+        this(new NGListeningAddress(null, NGConstants.DEFAULT_PORT), DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
     }
 
     /**
@@ -173,26 +171,14 @@ public class NGServer implements Runnable {
      * before disconnecting them
      */
     public NGServer(NGListeningAddress listeningAddress, int sessionPoolSize, int timeoutMillis) {
-        init(listeningAddress, sessionPoolSize, timeoutMillis);
-    }
-
-    /**
-     * Sets up the NGServer internals
-     *
-     * @param listeningAddress the address to bind to
-     * @param port the port on which to listen
-     * @param sessionPoolSize the max number of idle sessions allowed by the
-     * pool
-     */
-    private void init(NGListeningAddress listeningAddress, int sessionPoolSize, int timeoutMillis) {
         this.listeningAddress = listeningAddress;
 
-        this.aliasManager = new AliasManager();
+        aliasManager = new AliasManager();
         allNailStats = new java.util.HashMap();
         // allow a maximum of 10 idle threads.  probably too high a number
         // and definitely should be configurable in the future
         sessionPool = new NGSessionPool(this, sessionPoolSize);
-        this.heartbeatTimeoutMillis = timeoutMillis;
+        heartbeatTimeoutMillis = timeoutMillis;
     }
 
     /**
@@ -279,7 +265,10 @@ public class NGServer implements Runnable {
      * @param nailClass the nail class that finished
      */
     void nailFinished(Class nailClass) {
-        NailStats stats = (NailStats) allNailStats.get(nailClass);
+        NailStats stats;
+        synchronized (allNailStats) {
+            stats = (NailStats) allNailStats.get(nailClass);
+        }
         stats.nailFinished();
     }
 
