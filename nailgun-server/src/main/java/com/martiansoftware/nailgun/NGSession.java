@@ -27,6 +27,7 @@ import java.lang.reflect.Method;
 import java.net.Socket;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -67,7 +68,7 @@ public class NGSession extends Thread {
      * The instance number of this NGSession. That is, if this is the Nth
      * NGSession to be created, then this is the value for N.
      */
-    private long instanceNumber = 0;
+    private final long instanceNumber;
 
     /**
      * The interval to wait between heartbeats before considering the client to have disconnected.
@@ -75,13 +76,9 @@ public class NGSession extends Thread {
     private int heartbeatTimeoutMillis = NGConstants.HEARTBEAT_TIMEOUT_MILLIS;
 
     /**
-     * A lock shared among all NGSessions
-     */
-    private static Object sharedLock = new Object();
-    /**
      * The instance counter shared among all NGSessions
      */
-    private static long instanceCounter = 0;
+    private static AtomicLong instanceCounter = new AtomicLong(0);
     /**
      * signature of main(String[]) for reflection operations
      */
@@ -124,10 +121,7 @@ public class NGSession extends Thread {
         this.sessionPool = sessionPool;
         this.server = server;
         this.heartbeatTimeoutMillis = server.getHeartbeatTimeout();
-
-        synchronized (sharedLock) {
-            this.instanceNumber = ++instanceCounter;
-        }
+        this.instanceNumber = instanceCounter.incrementAndGet();
 //		server.out.println("Created NGSession " + instanceNumber);
     }
 
