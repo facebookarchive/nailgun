@@ -66,7 +66,7 @@ public class NGServer implements Runnable {
     /**
      * True if this NGServer has been started and is accepting connections
      */
-    private boolean running = false;
+    private final AtomicBoolean running = new AtomicBoolean(false);
     
     /**
      * This NGServer's AliasManager, which maps aliases to classes
@@ -372,7 +372,7 @@ public class NGServer implements Runnable {
      * @return true iff the server is currently running.
      */
     public boolean isRunning() {
-        return (running);
+        return running.get();
     }
 
     /**
@@ -389,7 +389,7 @@ public class NGServer implements Runnable {
      * them.
      */
     public void run() {
-        running = true;
+        running.set(true);
         NGSession sessionOnDeck = null;
 
         originalSecurityManager = System.getSecurityManager();
@@ -437,7 +437,7 @@ public class NGServer implements Runnable {
         if (sessionOnDeck != null) {
             sessionOnDeck.shutdown();
         }
-        running = false;
+        running.set(false);
     }
 
     private static void usage() {
