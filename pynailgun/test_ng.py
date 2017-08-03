@@ -6,8 +6,7 @@ import unittest
 import tempfile
 import shutil
 import uuid
-
-import pkg_resources
+import sys
 
 from pynailgun import NailgunException, NailgunConnection
 
@@ -41,7 +40,6 @@ if os.name == 'nt':
         return result
 
 
-@unittest.skip('This test is flaky')
 class TestNailgunConnection(unittest.TestCase):
     def setUp(self):
         self.setUpTransport()
@@ -58,11 +56,7 @@ class TestNailgunConnection(unittest.TestCase):
             self.transport_file = ur'\\.\pipe\{0}'.format(pipe_name)
 
     def getNailgunUberJar(self):
-        stream = pkg_resources.resource_stream(__name__, 'nailgun-uber.jar')
-        uber_jar_path = os.path.join(self.tmpdir, 'nailgun-uber.jar')
-        with open(uber_jar_path, 'wb') as f:
-            f.write(stream.read())
-        return uber_jar_path
+        return 'nailgun-server/target/nailgun-server-0.9.2-SNAPSHOT-uber.jar'
 
     def startNailgun(self):
         if os.name == 'posix':
