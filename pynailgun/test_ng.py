@@ -89,6 +89,8 @@ class TestNailgunConnection(unittest.TestCase):
         for i in range(0, 600):
             if not transport_exists(self.transport_file):
                 time.sleep(0.01)
+            else:
+                break
 
         self.assertTrue(transport_exists(self.transport_file))
 
@@ -128,4 +130,5 @@ class TestNailgunConnection(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    for i in range(10):
+        unittest.main(exit=False)
