@@ -420,6 +420,32 @@ public class NGServer implements Runnable {
                     serversocket = new NGUnixDomainServerSocket(listeningAddress.getLocalAddress());
                 }
             }
+
+            String portDescription;
+            if (listeningAddress.isInetAddress() && listeningAddress.getInetPort() == 0) {
+                // if the port is 0, it will be automatically determined.
+                // add this little wait so the ServerSocket can fully
+                // initialize and we can see what port it chose.
+                int runningPort = getPort();
+                while (runningPort == 0) {
+                    try {
+                        Thread.sleep(50);
+                    } catch (Throwable toIgnore) {
+                    }
+                    runningPort = getPort();
+                }
+                portDescription = ", port " + runningPort;
+            } else {
+                portDescription = "";
+            }
+
+            out.println("NGServer "
+                    + NGConstants.VERSION
+                    + " started on "
+                    + listeningAddress.toString()
+                    + portDescription
+                    + ".");
+
             while (!shutdown.get()) {
                 sessionOnDeck = sessionPool.take();
                 Socket socket = serversocket.accept();
@@ -517,31 +543,6 @@ public class NGServer implements Runnable {
         t.start();
 
         Runtime.getRuntime().addShutdownHook(new NGServerShutdowner(server));
-
-        String portDescription;
-        if (listeningAddress.isInetAddress() && listeningAddress.getInetPort() == 0) {
-        // if the port is 0, it will be automatically determined.
-        // add this little wait so the ServerSocket can fully
-        // initialize and we can see what port it chose.
-        int runningPort = server.getPort();
-        while (runningPort == 0) {
-            try {
-                Thread.sleep(50);
-            } catch (Throwable toIgnore) {
-            }
-            runningPort = server.getPort();
-        }
-            portDescription = ", port " + runningPort;
-        } else {
-            portDescription = "";
-        }
-
-        System.out.println("NGServer "
-                + NGConstants.VERSION
-                + " started on "
-                + listeningAddress.toString()
-                + portDescription
-                + ".");
     }
 
     public int getHeartbeatTimeout() {
