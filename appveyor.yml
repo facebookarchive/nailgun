@@ -1,0 +1,24 @@
+os: Visual Studio 2015
+
+version: '{build}'
+
+environment:
+  matrix:
+    - JAVA_HOME: C:\Program Files\Java\jdk1.8.0
+
+install:
+  - cmd: choco install maven -y -f -i
+  - cmd: refreshenv
+  - cmd: set
+  - cmd: python --version
+  - cmd: java -version
+  - cmd: mvn -version
+
+# to disable automatic builds by MsBuild
+build: off
+
+build_script:
+  - "mvn package"
+
+test_script:
+  - "python -m pynailgun.test_ng"
