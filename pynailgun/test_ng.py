@@ -130,5 +130,7 @@ class TestNailgunConnection(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    for i in range(10):
-        unittest.main(exit=False)
+    for i in range(50):
+        was_successful = unittest.main(exit=False).result.wasSuccessful()
+        if not was_successful:
+            sys.exit(1)
