@@ -51,7 +51,7 @@ public class NGWin32NamedPipeServerSocket extends ServerSocket {
         this.connectedHandles = new LinkedBlockingQueue<>();
         this.closeCallback = handle -> {
             if (connectedHandles.remove(handle)) {
-                closeConnectedPipe(handle);
+                closeConnectedPipe(handle, false);
             }
             if (openHandles.remove(handle)) {
                 closeOpenPipe(handle);
@@ -149,7 +149,7 @@ public class NGWin32NamedPipeServerSocket extends ServerSocket {
             List<HANDLE> handlesToDisconnect = new ArrayList<>();
             connectedHandles.drainTo(handlesToDisconnect);
             for (HANDLE handle : handlesToDisconnect) {
-                closeConnectedPipe(handle);
+                closeConnectedPipe(handle, true);
             }
         } finally {
             API.CloseHandle(lockHandle);
@@ -161,8 +161,10 @@ public class NGWin32NamedPipeServerSocket extends ServerSocket {
         API.CloseHandle(handle);
     }
 
-    private void closeConnectedPipe(HANDLE handle) throws IOException {
-        API.FlushFileBuffers(handle);
+    private void closeConnectedPipe(HANDLE handle, boolean shutdown) throws IOException {
+        if (!shutdown) {
+            API.WaitForSingleObject(handle, 10000);
+        }
         API.DisconnectNamedPipe(handle);
         API.CloseHandle(handle);
     }
