@@ -66,7 +66,6 @@ class TestNailgunConnection(unittest.TestCase):
                 # `ssh localhost buck clean`).
                 dev_null_fd = os.open("/dev/null", os.O_RDWR)
                 os.dup2(dev_null_fd, 0)
-                os.dup2(dev_null_fd, 1)
                 os.dup2(dev_null_fd, 2)
                 os.close(dev_null_fd)
             creationflags = 0
@@ -76,21 +75,29 @@ class TestNailgunConnection(unittest.TestCase):
             DETACHED_PROCESS = 0x00000008
             creationflags = DETACHED_PROCESS
 
+        stdout = None
+        if os.name == 'posix':
+            stdout=subprocess.PIPE
         self.ng_server_process = subprocess.Popen(
             ['java', '-Djna.nosys=true', '-jar', self.getNailgunUberJar(), self.transport_address],
-            close_fds=True,
             preexec_fn=preexec_fn,
             creationflags=creationflags,
+            stdout=stdout,
         )
 
         self.assertIsNone(self.ng_server_process.poll())
 
-        # Give Java some time to create the listening socket.
-        for i in range(0, 600):
-            if not transport_exists(self.transport_file):
-                time.sleep(0.01)
-            else:
-                break
+        if os.name == 'posix':
+            # on *nix we have to for server to listen on bound socket
+            the_first_line = self.ng_server_process.stdout.readline().strip()
+            self.assertTrue("NGServer" in the_first_line and "started" in the_first_line, "Got a line: {0}".format(the_first_line))
+        else:
+            for _ in range(0, 600):
+                # on windows it is OK to rely on existence of the pipe file
+                if not transport_exists(self.transport_file):
+                    time.sleep(0.01)
+                else:
+                    break
 
         self.assertTrue(transport_exists(self.transport_file))
 
