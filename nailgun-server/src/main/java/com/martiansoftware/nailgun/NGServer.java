@@ -439,6 +439,8 @@ public class NGServer implements Runnable {
                 portDescription = "";
             }
 
+            // Only after this point nailgun server is ready to accept connections on all platforms.
+            // test_ng.py on *nix relies on reading this line from stdout to start connecting to server.
             out.println("NGServer "
                     + NGConstants.VERSION
                     + " started on "

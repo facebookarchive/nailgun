@@ -88,7 +88,7 @@ class TestNailgunConnection(unittest.TestCase):
         self.assertIsNone(self.ng_server_process.poll())
 
         if os.name == 'posix':
-            # on *nix we have to for server to listen on bound socket
+            # on *nix we have to wait for server to be ready to accept connections
             the_first_line = self.ng_server_process.stdout.readline().strip()
             self.assertTrue("NGServer" in the_first_line and "started" in the_first_line, "Got a line: {0}".format(the_first_line))
         else:
