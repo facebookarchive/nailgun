@@ -198,10 +198,10 @@ public class NGInputStream extends FilterInputStream implements Closeable {
             int hlen = din.readInt();
             byte chunkType = din.readByte();
             long readTime = System.currentTimeMillis();
-            long intervalMillis = readTime - lastReadTime;
 
             // Synchronize the remainder of the method on this object as it accesses internal state.
             synchronized (this) {
+                long intervalMillis = readTime - lastReadTime;
                 lastReadTime = readTime;
                 switch(chunkType) {
                     case NGConstants.CHUNKTYPE_STDIN:
@@ -243,7 +243,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     /**
 	 * @see java.io.InputStream#available()
 	 */
-	public int available() throws IOException {
+	public synchronized int available() throws IOException {
 		if (eof) return(0);
 		if (stdin == null) return(0);
 		return stdin.available();
@@ -267,7 +267,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
 	/**
 	 * @see java.io.InputStream.read(byte[])
 	 */
-	public int read(byte[] b) throws IOException {
+	public synchronized int read(byte[] b) throws IOException {
 		return (read(b, 0, b.length));
 	}
 
@@ -311,7 +311,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
 	/**
 	 * @return true if interval since last read is less than heartbeat timeout interval.
 	 */
-	public boolean isClientConnected() {
+	public synchronized boolean isClientConnected() {
 	    long intervalMillis = System.currentTimeMillis() - lastReadTime;
 	    return intervalMillis < heartbeatTimeoutMillis;
 	}
