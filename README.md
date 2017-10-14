@@ -1,6 +1,12 @@
 nailgun
 =======
 
+---
+**Note:**  Nailgun is based on original code developed by <a href="martylamb.com">Marty Lamb</a>.
+In October, 2017, Marty transferred the repository to Facebook, where it is currently
+maintained by [TODO].
+---
+
 Nailgun is a client, protocol, and server for running Java programs from
 the command line without incurring the JVM startup overhead.
 
@@ -15,3 +21,5 @@ The client is built using make.  From the project directory,
 you will additionally need to "make ng.exe".
 
 For more information, see [the nailgun website](http://martiansoftware.com/nailgun/).
+
+
