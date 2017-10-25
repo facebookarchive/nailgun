@@ -4,7 +4,7 @@ nailgun
 ---
 **Note:**  Nailgun is based on original code developed by <a href="http://martylamb.com/">Marty Lamb</a>.
 In October, 2017, Marty transferred the repository to Facebook, where it is currently
-maintained by [FIXME].  Nailgun will remain available under the Apache license, version 2.0.
+maintained by <a href="https://buckbuild.com/">Buck team</a>. Nailgun will remain available under the Apache license, version 2.0.
 ---
 
 Nailgun is a client, protocol, and server for running Java programs from
