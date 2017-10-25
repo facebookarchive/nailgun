@@ -19,10 +19,12 @@ import platform
 import optparse
 import os
 import os.path
+import Queue
 import select
 import socket
 import struct
 import sys
+from threading import Condition, Event, Thread
 
 # @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
 # @author Pete Kirkham (Win32 port)
@@ -55,8 +57,12 @@ HEARTBEAT_TIMEOUT_NANOS = NSEC_PER_SEC / 2
 HEARTBEAT_TIMEOUT_SECS = HEARTBEAT_TIMEOUT_NANOS / (NSEC_PER_SEC * 1.0)
 
 # We need to support Python 2.6 hosts which lack memoryview().
-HAS_MEMORYVIEW = 'memoryview' in dir(__builtins__)
+import __builtin__
+HAS_MEMORYVIEW = 'memoryview' in dir(__builtin__)
 
+EVENT_STDIN_CHUNK = 0
+EVENT_STDIN_CLOSED = 1
+EVENT_STDIN_EXCEPTION = 2
 
 class NailgunException(Exception):
     SOCKET_FAILED = 231
@@ -72,6 +78,301 @@ class NailgunException(Exception):
         return self.message
 
 
+class Transport(object):
+    def close(self):
+        raise NotImplementedError()
+
+    def sendall(self, data):
+        raise NotImplementedError()
+
+    def recv(self, size):
+        raise NotImplementedError()
+
+    def recv_into(self, buffer, size=None):
+        raise NotImplementedError()
+
+    def select(self, timeout_secs):
+        raise NotImplementedError()
+
+
+class UnixTransport(Transport):
+    def __init__(self, __socket):
+        self.__socket = __socket
+        self.recv_flags = 0
+        self.send_flags = 0
+        if hasattr(socket, 'MSG_WAITALL'):
+            self.recv_flags |= socket.MSG_WAITALL
+        if hasattr(socket, 'MSG_NOSIGNAL'):
+            self.send_flags |= socket.MSG_NOSIGNAL
+
+    def close(self):
+        return self.__socket.close()
+
+    def sendall(self, data):
+        result = self.__socket.sendall(data, self.send_flags)
+        return result
+
+    def recv(self, nbytes):
+        return self.__socket.recv(nbytes, self.recv_flags)
+
+    def recv_into(self, buffer, nbytes=None):
+        return self.__socket.recv_into(buffer, nbytes, self.recv_flags)
+
+    def select(self, timeout_secs):
+        select_list = [self.__socket]
+        readable, _, exceptional = select.select(
+            select_list, [], select_list, timeout_secs)
+        return (self.__socket in readable), (self.__socket in exceptional)
+
+
+if os.name == 'nt':
+    import ctypes.wintypes
+
+    wintypes = ctypes.wintypes
+    GENERIC_READ = 0x80000000
+    GENERIC_WRITE = 0x40000000
+    FILE_FLAG_OVERLAPPED = 0x40000000
+    OPEN_EXISTING = 3
+    INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+    FORMAT_MESSAGE_FROM_SYSTEM = 0x00001000
+    FORMAT_MESSAGE_ALLOCATE_BUFFER = 0x00000100
+    FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200
+    WAIT_FAILED = 0xFFFFFFFF
+    WAIT_TIMEOUT = 0x00000102
+    WAIT_OBJECT_0 = 0x00000000
+    WAIT_IO_COMPLETION = 0x000000C0
+    INFINITE = 0xFFFFFFFF
+
+    # Overlapped I/O operation is in progress. (997)
+    ERROR_IO_PENDING = 0x000003E5
+    ERROR_PIPE_BUSY = 231
+
+    # The pointer size follows the architecture
+    # We use WPARAM since this type is already conditionally defined
+    ULONG_PTR = ctypes.wintypes.WPARAM
+
+    class OVERLAPPED(ctypes.Structure):
+        _fields_ = [
+            ("Internal", ULONG_PTR), ("InternalHigh", ULONG_PTR),
+            ("Offset", wintypes.DWORD), ("OffsetHigh", wintypes.DWORD),
+            ("hEvent", wintypes.HANDLE)
+        ]
+
+    LPDWORD = ctypes.POINTER(wintypes.DWORD)
+
+    CreateFile = ctypes.windll.kernel32.CreateFileW
+    CreateFile.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                           wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD,
+                           wintypes.HANDLE]
+    CreateFile.restype = wintypes.HANDLE
+
+    CloseHandle = ctypes.windll.kernel32.CloseHandle
+    CloseHandle.argtypes = [wintypes.HANDLE]
+    CloseHandle.restype = wintypes.BOOL
+
+    ReadFile = ctypes.windll.kernel32.ReadFile
+    ReadFile.argtypes = [wintypes.HANDLE, wintypes.LPVOID, wintypes.DWORD,
+                         LPDWORD, ctypes.POINTER(OVERLAPPED)]
+    ReadFile.restype = wintypes.BOOL
+
+    WriteFile = ctypes.windll.kernel32.WriteFile
+    WriteFile.argtypes = [wintypes.HANDLE, wintypes.LPVOID, wintypes.DWORD,
+                          LPDWORD, ctypes.POINTER(OVERLAPPED)]
+    WriteFile.restype = wintypes.BOOL
+
+    GetLastError = ctypes.windll.kernel32.GetLastError
+    GetLastError.argtypes = []
+    GetLastError.restype = wintypes.DWORD
+
+    SetLastError = ctypes.windll.kernel32.SetLastError
+    SetLastError.argtypes = [wintypes.DWORD]
+    SetLastError.restype = None
+
+    FormatMessage = ctypes.windll.kernel32.FormatMessageW
+    FormatMessage.argtypes = [wintypes.DWORD, wintypes.LPVOID, wintypes.DWORD,
+                              wintypes.DWORD, ctypes.POINTER(wintypes.LPCWSTR),
+                              wintypes.DWORD, wintypes.LPVOID]
+    FormatMessage.restype = wintypes.DWORD
+
+    LocalFree = ctypes.windll.kernel32.LocalFree
+
+    GetOverlappedResult = ctypes.windll.kernel32.GetOverlappedResult
+    GetOverlappedResult.argtypes = [wintypes.HANDLE,
+                                    ctypes.POINTER(OVERLAPPED), LPDWORD,
+                                    wintypes.BOOL]
+    GetOverlappedResult.restype = wintypes.BOOL
+
+    CreateEvent = ctypes.windll.kernel32.CreateEventW
+    CreateEvent.argtypes = [LPDWORD, wintypes.BOOL, wintypes.BOOL,
+                            wintypes.LPCWSTR]
+    CreateEvent.restype = wintypes.HANDLE
+
+    PeekNamedPipe = ctypes.windll.kernel32.PeekNamedPipe
+    PeekNamedPipe.argtypes = [
+        wintypes.HANDLE,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        LPDWORD,
+        LPDWORD,
+        LPDWORD,
+    ]
+    PeekNamedPipe.restype = wintypes.BOOL
+
+    WaitNamedPipe = ctypes.windll.kernel32.WaitNamedPipeW
+    WaitNamedPipe.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+    ]
+    WaitNamedPipe.restype = wintypes.BOOL
+
+    def _win32_strerror(err):
+        """ expand a win32 error code into a human readable message """
+        # FormatMessage will allocate memory and assign it here
+        buf = ctypes.c_wchar_p()
+        FormatMessage(
+            FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER |
+            FORMAT_MESSAGE_IGNORE_INSERTS, None, err, 0, buf, 0, None)
+        try:
+            return buf.value
+        finally:
+            LocalFree(buf)
+
+
+class WindowsNamedPipeTransport(Transport):
+    """ connect to a named pipe """
+
+    def __init__(self, sockpath):
+        self.sockpath = ur'\\.\pipe\{0}'.format(sockpath)
+
+        while True:
+            self.pipe = CreateFile(self.sockpath,
+                                   GENERIC_READ | GENERIC_WRITE,
+                                   0,
+                                   None,
+                                   OPEN_EXISTING,
+                                   FILE_FLAG_OVERLAPPED,
+                                   None)
+            err1 = GetLastError()
+            msg = _win32_strerror(err1)
+            if self.pipe != INVALID_HANDLE_VALUE:
+                break
+            if err1 != ERROR_PIPE_BUSY:
+                self.pipe = None
+                raise NailgunException(
+                    msg,
+                    NailgunException.CONNECT_FAILED)
+            if not WaitNamedPipe(self.sockpath, 5000):
+                self.pipe = None
+                raise NailgunException(
+                    "time out while waiting for a pipe",
+                    NailgunException.CONNECT_FAILED)
+
+        # event for the overlapped I/O operations
+        self.read_waitable = CreateEvent(None, True, False, None)
+        if self.read_waitable is None:
+            raise NailgunException(
+                'CreateEvent failed',
+                NailgunException.CONNECT_FAILED)
+        self.write_waitable = CreateEvent(None, True, False, None)
+        if self.write_waitable is None:
+            raise NailgunException(
+                'CreateEvent failed',
+                NailgunException.CONNECT_FAILED)
+
+    def _raise_win_err(self, msg, err):
+        raise IOError('%s win32 error code: %d %s' %
+                      (msg, err, _win32_strerror(err)))
+
+    def close(self):
+        if self.pipe:
+            CloseHandle(self.pipe)
+        self.pipe = None
+
+        if self.read_waitable is not None:
+            CloseHandle(self.read_waitable)
+        self.read_waitable = None
+
+        if self.write_waitable is not None:
+            CloseHandle(self.write_waitable)
+        self.write_waitable = None
+
+    def recv_into(self, buffer, nbytes):
+        # we don't use memoryview because OVERLAPPED I/O happens
+        # after the method (ReadFile) returns
+        buf = ctypes.create_string_buffer(nbytes)
+        olap = OVERLAPPED()
+        olap.hEvent = self.read_waitable
+
+        immediate = ReadFile(self.pipe, buf, nbytes, None, olap)
+
+        if not immediate:
+            err = GetLastError()
+            if err != ERROR_IO_PENDING:
+                self._raise_win_err('failed to read %d bytes' % nbytes,
+                                    GetLastError())
+
+        nread = wintypes.DWORD()
+        if not GetOverlappedResult(self.pipe,
+                                   olap,
+                                   nread,
+                                   True):
+            err = GetLastError()
+            self._raise_win_err('error while waiting for read', err)
+
+        nread = nread.value
+        buffer[:nread] = buf[:nread]
+        return nread
+
+    def sendall(self, data):
+        olap = OVERLAPPED()
+        olap.hEvent = self.write_waitable
+        p = (ctypes.c_ubyte*len(data))(*(bytearray(data)))
+        immediate = WriteFile(self.pipe,
+                              p,
+                              len(data),
+                              None,
+                              olap)
+
+        if not immediate:
+            err = GetLastError()
+            if err != ERROR_IO_PENDING:
+                self._raise_win_err('failed to write %d bytes' % len(data),
+                                    GetLastError())
+
+        # Obtain results, waiting if needed
+        nwrote = wintypes.DWORD()
+        if not GetOverlappedResult(self.pipe,
+                                   olap,
+                                   nwrote,
+                                   True):
+            err = GetLastError()
+            self._raise_win_err('error while waiting for write', err)
+        nwrote = nwrote.value
+        if nwrote != len(data):
+            raise IOError('Async wrote less bytes!')
+        return nwrote
+
+    def select(self, timeout_secs):
+        start = monotonic_time_nanos()
+        timeout_nanos = timeout_secs * NSEC_PER_SEC
+        while True:
+            readable, exceptional = self.select_now()
+            if readable or exceptional or monotonic_time_nanos() - start > timeout_nanos:
+                return readable, exceptional
+
+    def select_now(self):
+        available_total = wintypes.DWORD()
+        exceptional = not PeekNamedPipe(self.pipe,
+                                        None,
+                                        0,
+                                        None,
+                                        available_total,
+                                        None)
+        readable = available_total.value > 0
+        result = readable, exceptional
+        return result
+
+
 class NailgunConnection(object):
     '''Stateful object holding the connection to the Nailgun server.'''
 
@@ -81,23 +382,25 @@ class NailgunConnection(object):
             server_port=None,
             stdin=sys.stdin,
             stdout=sys.stdout,
-            stderr=sys.stderr):
-        self.socket = make_nailgun_socket(server_name, server_port)
+            stderr=sys.stderr,
+            cwd=None):
+        self.transport = make_nailgun_transport(server_name, server_port, cwd)
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
         self.recv_flags = 0
         self.send_flags = 0
-        if hasattr(socket, 'MSG_WAITALL'):
-            self.recv_flags |= socket.MSG_WAITALL
-        if hasattr(socket, 'MSG_NOSIGNAL'):
-            self.send_flags |= socket.MSG_NOSIGNAL
         self.header_buf = ctypes.create_string_buffer(CHUNK_HEADER_LEN)
         self.buf = ctypes.create_string_buffer(BUFSIZE)
-        self.ready_to_send = True
-        self.stdin_eof = False
+        self.ready_to_send_condition = Condition()
         self.sendtime_nanos = 0
         self.exit_code = None
+        self.stdin_queue = Queue.Queue()
+        self.shutdown_event = Event()
+        self.stdin_thread = Thread(
+            target=stdin_thread_main,
+            args=(self.stdin, self.stdin_queue, self.shutdown_event, self.ready_to_send_condition))
+        self.stdin_thread.daemon = True
 
     def send_command(
             self,
@@ -107,8 +410,19 @@ class NailgunConnection(object):
             env=os.environ,
             cwd=os.getcwd()):
         '''
-        Sends the command and environment to the nailgun server.
+        Sends the command and environment to the nailgun server, then loops forever
+        reading the response until the server sends an exit chunk.
+
+        Returns the exit value, or raises NailgunException on error.
         '''
+        try:
+            return self._send_command_and_read_response(cmd, cmd_args, filearg, env, cwd)
+        except socket.error as e:
+            raise NailgunException(
+                'Server disconnected unexpectedly: {0}'.format(e),
+                NailgunException.CONNECTION_BROKEN)
+
+    def _send_command_and_read_response(self, cmd, cmd_args, filearg, env, cwd):
         if filearg:
             send_file_arg(filearg, self)
         for cmd_arg in cmd_args:
@@ -122,40 +436,54 @@ class NailgunConnection(object):
             send_env_var(k, v, self)
         send_chunk(cwd, CHUNKTYPE_DIR, self)
         send_chunk(cmd, CHUNKTYPE_CMD, self)
-        # TODO(bhamiltoncx): You can't select on both FDs and sockets on Windows.
-        # We need a separate thread for that.
+        self.stdin_thread.start()
         while self.exit_code is None:
             self._process_next_chunk()
+            self._check_stdin_queue()
+        self.shutdown_event.set()
+        with self.ready_to_send_condition:
+            self.ready_to_send_condition.notify()
+        # We can't really join on self.stdin_thread, since
+        # there's no way to interrupt its call to sys.stdin.readline.
         return self.exit_code
 
     def _process_next_chunk(self):
         '''
         Processes the next chunk from the nailgun server.
         '''
-        select_list = set([self.socket])
-        if self.ready_to_send and not self.stdin_eof:
-            select_list.add(sys.stdin)
-        readable, _, exceptional = select.select(
-            select_list, [], select_list, HEARTBEAT_TIMEOUT_SECS)
-        for r in readable:
-            if r is self.socket:
-                process_nailgun_stream(self)
-            elif r is sys.stdin:
-                if not process_stdin(self):
-                    self.stdin_eof = True
+        readable, exceptional = self.transport.select(HEARTBEAT_TIMEOUT_SECS)
+        if readable:
+            process_nailgun_stream(self)
         now = monotonic_time_nanos()
         if now - self.sendtime_nanos > HEARTBEAT_TIMEOUT_NANOS:
             send_heartbeat(self)
-        if self.socket in exceptional:
+        if exceptional:
             raise NailgunException(
                 'Server disconnected in select',
                 NailgunException.CONNECTION_BROKEN)
+
+    def _check_stdin_queue(self):
+        '''Check if the stdin thread has read anything.'''
+        while not self.stdin_queue.empty():
+            try:
+                (event_type, event_arg) = self.stdin_queue.get_nowait()
+                if event_type == EVENT_STDIN_CHUNK:
+                    send_chunk(event_arg, CHUNKTYPE_STDIN, self)
+                elif event_type == EVENT_STDIN_CLOSED:
+                    send_chunk('', CHUNKTYPE_STDIN_EOF, self)
+                elif event_type == EVENT_STDIN_EXCEPTION:
+                    raise event_arg
+            except Queue.Empty:
+                break
 
     def __enter__(self):
         return self
 
     def __exit__(self, type, value, traceback):
-        self.socket.close()
+        try:
+            self.transport.close()
+        except socket.error:
+            pass
 
 
 def monotonic_time_nanos():
@@ -230,10 +558,8 @@ def send_chunk(buf, chunk_type, nailgun_connection):
     '''
     struct.pack_into('>ic', nailgun_connection.header_buf, 0, len(buf), chunk_type)
     nailgun_connection.sendtime_nanos = monotonic_time_nanos()
-    nailgun_connection.socket.sendall(
-        nailgun_connection.header_buf.raw,
-        nailgun_connection.send_flags)
-    nailgun_connection.socket.sendall(buf, nailgun_connection.send_flags)
+    nailgun_connection.transport.sendall(nailgun_connection.header_buf.raw)
+    nailgun_connection.transport.sendall(buf)
 
 
 def send_env_var(name, value, nailgun_connection):
@@ -276,10 +602,9 @@ def recv_to_fd(dest_file, num_bytes, nailgun_connection):
 
     while bytes_read < num_bytes:
         bytes_to_read = min(len(nailgun_connection.buf), num_bytes - bytes_read)
-        bytes_received = nailgun_connection.socket.recv_into(
+        bytes_received = nailgun_connection.transport.recv_into(
             nailgun_connection.buf,
-            bytes_to_read,
-            nailgun_connection.recv_flags)
+            bytes_to_read)
         if dest_file:
             dest_file.write(nailgun_connection.buf[:bytes_received])
         bytes_read += bytes_received
@@ -306,10 +631,9 @@ def recv_into_memoryview(num_bytes, buf_view, nailgun_connection):
     '''
     bytes_read = 0
     while bytes_read < num_bytes:
-        bytes_received = nailgun_connection.socket.recv_into(
+        bytes_received = nailgun_connection.transport.recv_into(
             buf_view[bytes_read:],
-            num_bytes - bytes_read,
-            nailgun_connection.recv_flags)
+            num_bytes - bytes_read)
         if not bytes_received:
             raise NailgunException(
                 'Server unexpectedly disconnected in recv_into()',
@@ -323,9 +647,8 @@ def recv_to_buffer_with_copy(num_bytes, buf, nailgun_connection):
     '''
     bytes_read = 0
     while bytes_read < num_bytes:
-        recv_buf = nailgun_connection.socket.recv(
-            num_bytes - bytes_read,
-            nailgun_connection.recv_flags)
+        recv_buf = nailgun_connection.transport.recv(
+            num_bytes - bytes_read)
         if not len(recv_buf):
             raise NailgunException(
                 'Server unexpectedly disconnected in recv()',
@@ -344,43 +667,37 @@ def process_exit(exit_len, nailgun_connection):
     nailgun_connection.exit_code = int(''.join(nailgun_connection.buf.raw[:num_bytes]))
 
 
-def send_stdin(stdin_len, nailgun_connection):
-    '''
-    Sends stdin_len bytes read from the connected terminal to the nailgun server.
-    '''
-    nailgun_connection.ready_to_send = False
-    send_chunk(nailgun_connection.buf.raw[:stdin_len], CHUNKTYPE_STDIN, nailgun_connection)
-
-
-def process_eof(nailgun_connection):
-    '''
-    Sends a stdin EOF chunk to the nailgun server.
-    '''
-    send_chunk('', CHUNKTYPE_STDIN_EOF, nailgun_connection)
-
-
 def send_heartbeat(nailgun_connection):
     '''
     Sends a heartbeat to the nailgun server to indicate the client is still alive.
     '''
-    send_chunk('', CHUNKTYPE_HEARTBEAT, nailgun_connection)
+    try:
+        send_chunk('', CHUNKTYPE_HEARTBEAT, nailgun_connection)
+    except IOError as e:
+        # The Nailgun C client ignores SIGPIPE etc. on heartbeats,
+        # so we do too. (This typically happens when shutting down.)
+        pass
 
 
-def process_stdin(nailgun_connection):
-    '''
-    Reads from stdin and transmits it to the nailgun server in a stdin chunk.
-    Sends a stdin-eof chunk if necessary.
-
-    Returns the number of bytes read, or 0 to indicate EOF.
-    '''
-    if not nailgun_connection.stdin:
+def stdin_thread_main(stdin, queue, shutdown_event, ready_to_send_condition):
+    if not stdin:
         return
-    bytes_read = nailgun_connection.stdin.readinto(nailgun_connection.buf)
-    if bytes_read > 0:
-        send_stdin(bytes_read, nailgun_connection)
-    else:
-        process_eof(nailgun_connection)
-    return bytes_read
+    try:
+        while not shutdown_event.is_set():
+            with ready_to_send_condition:
+                ready_to_send_condition.wait()
+            if shutdown_event.is_set():
+                break
+            # This is a bit cheesy, but there isn't a great way to
+            # portably tell Python to read as much as possible on
+            # stdin without blocking.
+            buf = stdin.readline()
+            if buf == '':
+                queue.put((EVENT_STDIN_CLOSED, None))
+                break
+            queue.put((EVENT_STDIN_CHUNK, buf))
+    except Exception as e:
+        queue.put((EVENT_STDIN_EXCEPTION, e))
 
 
 def process_nailgun_stream(nailgun_connection):
@@ -398,32 +715,45 @@ def process_nailgun_stream(nailgun_connection):
     elif chunk_type == CHUNKTYPE_EXIT:
         process_exit(chunk_len, nailgun_connection)
     elif chunk_type == CHUNKTYPE_SENDINPUT:
-        nailgun_connection.ready_to_send = True
+        with nailgun_connection.ready_to_send_condition:
+            # Wake up the stdin thread and tell it to read as much data as possible.
+            nailgun_connection.ready_to_send_condition.notify()
     else:
         raise NailgunException(
             'Unexpected chunk type: {0}'.format(chunk_type),
             NailgunException.UNEXPECTED_CHUNKTYPE)
 
 
-def make_nailgun_socket(nailgun_server, nailgun_port=None):
+def make_nailgun_transport(nailgun_server, nailgun_port=None, cwd=None):
     '''
     Creates and returns a socket connection to the nailgun server.
     '''
-    s = None
+    transport = None
     if nailgun_server.startswith('local:'):
-        try:
-            s = socket.socket(socket.AF_UNIX)
-        except socket.error as msg:
-            raise NailgunException(
-                'Could not create local socket connection to server: {0}'.format(msg),
-                NailgunException.SOCKET_FAILED)
-        socket_addr = nailgun_server[6:]
-        try:
-            s.connect(socket_addr)
-        except socket.error as msg:
-            raise NailgunException(
-                'Could not connect to local server at {0}: {1}'.format(socket_addr, msg),
-                NailgunException.CONNECT_FAILED)
+        if platform.system() == 'Windows':
+            pipe_addr = nailgun_server[6:]
+            transport = WindowsNamedPipeTransport(pipe_addr)
+        else:
+            try:
+                s = socket.socket(socket.AF_UNIX)
+            except socket.error as msg:
+                raise NailgunException(
+                    'Could not create local socket connection to server: {0}'.format(msg),
+                    NailgunException.SOCKET_FAILED)
+            socket_addr = nailgun_server[6:]
+            prev_cwd = os.getcwd()
+            try:
+                if cwd is not None:
+                    os.chdir(cwd)
+                s.connect(socket_addr)
+                transport = UnixTransport(s)
+            except socket.error as msg:
+                raise NailgunException(
+                    'Could not connect to local server at {0}: {1}'.format(socket_addr, msg),
+                    NailgunException.CONNECT_FAILED)
+            finally:
+                if cwd is not None:
+                    os.chdir(prev_cwd)
     else:
         socket_addr = nailgun_server
         socket_family = socket.AF_UNSPEC
@@ -436,16 +766,17 @@ def make_nailgun_socket(nailgun_server, nailgun_port=None):
                 continue
             try:
                 s.connect(sa)
+                transport = UnixTransport(s)
             except socket.error as msg:
                 s.close()
                 s = None
                 continue
             break
-    if s is None:
+    if transport is None:
         raise NailgunException(
             'Could not connect to server {0}:{1}'.format(nailgun_server, nailgun_port),
-            NailgunException.NAILGUN_CONNECT_FAILED)
-    return s
+            NailgunException.CONNECT_FAILED)
+    return transport
 
 
 def main():
@@ -476,8 +807,8 @@ def main():
 
     try:
         with NailgunConnection(
-                nailgun_server=options.nailgun_server,
-                nailgun_port=options.nailgun_port) as c:
+                options.nailgun_server,
+                server_port=options.nailgun_port) as c:
             exit_code = c.send_command(cmd, cmd_args, options.nailgun_filearg)
             sys.exit(exit_code)
     except NailgunException as e:

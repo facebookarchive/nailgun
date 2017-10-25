@@ -32,12 +32,12 @@ class NGSessionPool {
 	/**
 	 * number of sessions to store in the pool
 	 */
-	int poolSize = 0;
+	final int poolSize;
 
 	/**
 	 * the pool itself
 	 */
-	NGSession[] pool = null;
+	final NGSession[] pool;
 	
 	/**
 	 * The number of sessions currently in the pool
@@ -47,7 +47,7 @@ class NGSessionPool {
 	/**
 	 * reference to server we're working for
 	 */
-	NGServer server = null;
+	final NGServer server;
 	
 	/**
 	 * have we been shut down?
@@ -57,7 +57,7 @@ class NGSessionPool {
 	/**
 	 * synchronization object
 	 */
-	private Object lock = new Object();
+	private final Object lock = new Object();
 	
 	/**
 	 * Creates a new NGSessionRunner operating for the specified server, with
@@ -97,24 +97,24 @@ class NGSessionPool {
 	 * @param session the NGSession to return to the pool
 	 */
 	void give(NGSession session) {
-            boolean shutdown = false;
-            synchronized(lock) {
-		if (done || poolEntries == poolSize) {
-                    shutdown = true;
-                } else {
-                    pool[poolEntries] = session;
-                    ++poolEntries;
-		}
-            }
-            if (shutdown) session.shutdown();
+        boolean shutdown = false;
+        synchronized(lock) {
+    		if (done || poolEntries == poolSize) {
+                shutdown = true;
+            } else {
+                pool[poolEntries] = session;
+                ++poolEntries;
+	    	}
+        }
+        if (shutdown) session.shutdown();
 	}
 	
 	/**
 	 * Shuts down the pool.  Running nails are allowed to finish.
 	 */
 	void shutdown() {
-		done = true;
 		synchronized(lock) {
+			done = true;
 			while (poolEntries > 0) {
 				take().shutdown();
 			}

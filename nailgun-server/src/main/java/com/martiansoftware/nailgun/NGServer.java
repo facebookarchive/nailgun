@@ -26,11 +26,14 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.martiansoftware.nailgun.builtins.DefaultNail;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import com.sun.jna.Platform;
 
 /**
  * <p>Listens for new connections from NailGun clients and launches NGSession
@@ -57,7 +60,7 @@ public class NGServer implements Runnable {
     /**
      * The address on which to listen
      */
-    private NGListeningAddress listeningAddress = null;
+    private final NGListeningAddress listeningAddress;
     
     /**
      * The socket doing the listening
@@ -67,17 +70,17 @@ public class NGServer implements Runnable {
     /**
      * True if this NGServer has received instructions to shut down
      */
-    private boolean shutdown = false;
+    private final AtomicBoolean shutdown = new AtomicBoolean(false);
     
     /**
      * True if this NGServer has been started and is accepting connections
      */
-    private boolean running = false;
+    private final AtomicBoolean running = new AtomicBoolean(false);
     
     /**
      * This NGServer's AliasManager, which maps aliases to classes
      */
-    private AliasManager aliasManager;
+    private final AliasManager aliasManager;
     
     /**
      * If true, fully-qualified classnames are valid commands
@@ -93,7 +96,7 @@ public class NGServer implements Runnable {
     /**
      * A pool of NGSessions ready to handle client connections
      */
-    private NGSessionPool sessionPool = null;
+    private final NGSessionPool sessionPool;
     
     /**
      * <code>System.out</code> at the time of the NGServer's creation
@@ -113,13 +116,13 @@ public class NGServer implements Runnable {
     /**
      * a collection of all classes executed by this server so far
      */
-    private Map allNailStats = null;
+    private final Map allNailStats;
     
     /**
      * Remember the security manager we start with so we can restore it later
      */
     private SecurityManager originalSecurityManager = null;
-    private int heartbeatTimeoutMillis = NGConstants.HEARTBEAT_TIMEOUT_MILLIS;
+    private final int heartbeatTimeoutMillis;
 
     /**
      * Creates a new NGServer that will listen at the specified address and on
@@ -135,7 +138,7 @@ public class NGServer implements Runnable {
      * pool
      */
     public NGServer(InetAddress addr, int port, int sessionPoolSize, int timeoutMillis) {
-        init(new NGListeningAddress(addr, port), sessionPoolSize, timeoutMillis);
+        this(new NGListeningAddress(addr, port), sessionPoolSize, timeoutMillis);
     }
 
     /**
@@ -150,7 +153,7 @@ public class NGServer implements Runnable {
      * @param port the port on which to listen.
      */
     public NGServer(InetAddress addr, int port) {
-        init(new NGListeningAddress(addr, port), DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
+        this(new NGListeningAddress(addr, port), DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
     }
 
     /**
@@ -161,7 +164,7 @@ public class NGServer implements Runnable {
      * <code>NGServer</code> and start it.
      */
     public NGServer() {
-        init(new NGListeningAddress(null, NGConstants.DEFAULT_PORT), DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
+        this(new NGListeningAddress(null, NGConstants.DEFAULT_PORT), DEFAULT_SESSIONPOOLSIZE, NGConstants.HEARTBEAT_TIMEOUT_MILLIS);
     }
 
     /**
@@ -178,26 +181,14 @@ public class NGServer implements Runnable {
      * before disconnecting them
      */
     public NGServer(NGListeningAddress listeningAddress, int sessionPoolSize, int timeoutMillis) {
-        init(listeningAddress, sessionPoolSize, timeoutMillis);
-    }
-
-    /**
-     * Sets up the NGServer internals
-     *
-     * @param listeningAddress the address to bind to
-     * @param port the port on which to listen
-     * @param sessionPoolSize the max number of idle sessions allowed by the
-     * pool
-     */
-    private void init(NGListeningAddress listeningAddress, int sessionPoolSize, int timeoutMillis) {
         this.listeningAddress = listeningAddress;
 
-        this.aliasManager = new AliasManager();
+        aliasManager = new AliasManager();
         allNailStats = new java.util.HashMap();
         // allow a maximum of 10 idle threads.  probably too high a number
         // and definitely should be configurable in the future
         sessionPool = new NGSessionPool(this, sessionPoolSize);
-        this.heartbeatTimeoutMillis = timeoutMillis;
+        heartbeatTimeoutMillis = timeoutMillis;
     }
 
     /**
@@ -284,7 +275,10 @@ public class NGServer implements Runnable {
      * @param nailClass the nail class that finished
      */
     void nailFinished(Class nailClass) {
-        NailStats stats = (NailStats) allNailStats.get(nailClass);
+        NailStats stats;
+        synchronized (allNailStats) {
+            stats = (NailStats) allNailStats.get(nailClass);
+        }
         stats.nailFinished();
     }
 
@@ -331,11 +325,8 @@ public class NGServer implements Runnable {
      * by your nails.
      */
     public void shutdown(boolean exitVM) {
-        synchronized (this) {
-            if (shutdown) {
-                return;
-            }
-            shutdown = true;
+        if (shutdown.getAndSet(true)) {
+            return;
         }
 
         try {
@@ -390,7 +381,7 @@ public class NGServer implements Runnable {
      * @return true iff the server is currently running.
      */
     public boolean isRunning() {
-        return (running);
+        return running.get();
     }
 
     /**
@@ -407,7 +398,7 @@ public class NGServer implements Runnable {
      * them.
      */
     public void run() {
-        running = true;
+        running.set(true);
         NGSession sessionOnDeck = null;
 
         originalSecurityManager = System.getSecurityManager();
@@ -432,10 +423,26 @@ public class NGServer implements Runnable {
                     serversocket = new ServerSocket(listeningAddress.getInetPort(), 0, listeningAddress.getInetAddress());
                 }
             } else {
-                serversocket = new NGUnixDomainServerSocket(listeningAddress.getLocalAddress());
+                if (Platform.isWindows()) {
+                    serversocket = new NGWin32NamedPipeServerSocket(listeningAddress.getLocalAddress());
+                } else {
+                    serversocket = new NGUnixDomainServerSocket(listeningAddress.getLocalAddress());
+                }
             }
+
+            while (!shutdown.get()) {
+                sessionOnDeck = sessionPool.take();
+                Socket socket = serversocket.accept();
+                sessionOnDeck.run(socket);
+            }
+
         } catch (Throwable t) {
-        	getLogger().log(Level.SEVERE, "Failed to create server socket", t);
+            // if shutdown is called while the accept() method is blocking,
+            // an exception will be thrown that we don't care about.  filter
+            // those out.
+            if (!shutdown.get()) {
+        	      getLogger().log(Level.SEVERE, "Failed to create server socket", t);
+            }
         }
         
         if (serversocket != null) {
@@ -459,7 +466,7 @@ public class NGServer implements Runnable {
         if (sessionOnDeck != null) {
             sessionOnDeck.shutdown();
         }
-        running = false;
+        running.set(false);
     }
 
     private static void usage() {
@@ -513,7 +520,7 @@ public class NGServer implements Runnable {
             } else {
                 portPart = argParts[0];
             }
-            if (addrPart.equals("local") && portPart != null) {
+            if ("local".equals(addrPart) && portPart != null) {
                 // Treat the port part as a path to a local Unix domain socket
                 // or Windows named pipe.
                 listeningAddress = new NGListeningAddress(portPart);

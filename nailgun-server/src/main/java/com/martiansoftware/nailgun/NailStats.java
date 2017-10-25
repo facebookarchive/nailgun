@@ -26,10 +26,10 @@ package com.martiansoftware.nailgun;
 
 public class NailStats implements Cloneable {
 
-	private Class nailclass;
+	private final Class nailclass;
 	private long runCounter;
 	private long refCounter;
-	private Object lock;
+	private final Object lock;
 	
 	/**
 	 * Creates a new NailStats object for the specified class

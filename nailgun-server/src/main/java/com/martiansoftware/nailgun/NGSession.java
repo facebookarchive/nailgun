@@ -19,6 +19,7 @@ package com.martiansoftware.nailgun;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
@@ -26,6 +27,9 @@ import java.lang.reflect.Method;
 import java.net.Socket;
 import java.util.List;
 import java.util.Properties;
+
+import java.util.concurrent.atomic.AtomicLong;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,24 +41,22 @@ import java.util.logging.Logger;
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class NGSession extends Thread {
-	
-	/**
-	 * {@linkplain Logger} instance for this class.
-	 */
-	private static final Logger LOGGER = Logger.getLogger(NGServer.class.getName());
-	
-	/**
+    /**
+	   * {@linkplain Logger} instance for this class.
+	   */
+    private static final Logger LOG = Logger.getLogger(NGSession.class.getName());
+    /**
      * The server this NGSession is working for
      */
-    private NGServer server = null;
+    private final NGServer server;
     /**
      * The pool this NGSession came from, and to which it will return itself
      */
-    private NGSessionPool sessionPool = null;
+    private final NGSessionPool sessionPool;
     /**
      * Synchronization object
      */
-    private Object lock = new Object();
+    private final Object lock = new Object();
     /**
      * The next socket this NGSession has been tasked with processing (by
      * NGServer)
@@ -69,29 +71,29 @@ public class NGSession extends Thread {
      * The instance number of this NGSession. That is, if this is the Nth
      * NGSession to be created, then this is the value for N.
      */
-    private long instanceNumber = 0;
+    private final long instanceNumber;
 
     /**
      * The interval to wait between heartbeats before considering the client to have disconnected.
      */
-    private int heartbeatTimeoutMillis = NGConstants.HEARTBEAT_TIMEOUT_MILLIS;
+    private final int heartbeatTimeoutMillis;
 
-    /**
-     * A lock shared among all NGSessions
-     */
-    private static Object sharedLock = new Object();
     /**
      * The instance counter shared among all NGSessions
      */
-    private static long instanceCounter = 0;
+    private static AtomicLong instanceCounter = new AtomicLong(0);
     /**
      * signature of main(String[]) for reflection operations
      */
-    private static Class[] mainSignature;
+    private final static Class[] mainSignature = {
+            String[].class,
+    };
     /**
      * signature of nailMain(NGContext) for reflection operations
      */
-    private static Class[] nailMainSignature;
+    private final static Class[] nailMainSignature = {
+            NGContext.class,
+    };
 
     /**
      * A ClassLoader that may be set by a client. Defaults to the classloader of this class.
@@ -99,13 +101,6 @@ public class NGSession extends Thread {
     public static volatile ClassLoader classLoader = null; // initialized in the static initializer - see below
 
     static {
-        // initialize the signatures
-        mainSignature = new Class[1];
-        mainSignature[0] = String[].class;
-
-        nailMainSignature = new Class[1];
-        nailMainSignature[0] = NGContext.class;
-        
         try {
             classLoader = NGSession.class.getClassLoader();
         } catch (SecurityException e) {
@@ -126,10 +121,7 @@ public class NGSession extends Thread {
         this.sessionPool = sessionPool;
         this.server = server;
         this.heartbeatTimeoutMillis = server.getHeartbeatTimeout();
-
-        synchronized (sharedLock) {
-            this.instanceNumber = ++instanceCounter;
-        }
+        this.instanceNumber = instanceCounter.incrementAndGet();
 //		server.out.println("Created NGSession " + instanceNumber);
     }
 
@@ -137,8 +129,8 @@ public class NGSession extends Thread {
      * Shuts down this NGSession gracefully
      */
     void shutdown() {
-        done = true;
         synchronized (lock) {
+            done = true;
             nextSocket = null;
             lock.notifyAll();
         }
@@ -190,8 +182,10 @@ public class NGSession extends Thread {
 
         updateThreadName(null);
 
+        LOG.log(Level.FINE, "Waiting for first client to connect");
         Socket socket = nextSocket();
         while (socket != null) {
+            LOG.log(Level.FINE, "Client connected");
             try {
                 DataInputStream sockin = new DataInputStream(socket.getInputStream());
                 DataOutputStream sockout = new DataOutputStream(socket.getOutputStream());
@@ -354,16 +348,19 @@ public class NGSession extends Thread {
                         }
 
                     } catch (NGExitException exitEx) {
+                        LOG.log(Level.INFO, "Server cleanly exited with status " + exitEx.getStatus(), exitEx);
                         in.close();
                         exit.println(exitEx.getStatus());
                         server.getLogger().log(Level.INFO, Thread.currentThread().getName() + " exited with status " + exitEx.getStatus());
                     } catch (Throwable t) {
+                        LOG.log(Level.INFO, "Server unexpectedly exited with unhandled exception", t);
                         in.close();
                         // t.printStackTrace();
                         LOGGER.log(Level.SEVERE, t.getMessage(), t);
                         exit.println(NGConstants.EXIT_EXCEPTION); // remote exception constant
                     }
                 } finally {
+                    LOG.log(Level.FINE, "Tearing down client socket");
                     if (in != null) {
                         in.close();
                     }
@@ -376,15 +373,24 @@ public class NGSession extends Thread {
                     if (exit != null) {
                         exit.close();
                     }
+                    LOG.log(Level.FINE, "Flushing client socket");
                     sockout.flush();
-                    socket.shutdownInput();
-                    socket.shutdownOutput();
+                    try {
+                        socket.shutdownInput();
+                        socket.shutdownOutput();
+                    } catch (IOException e) {
+                        LOG.log(
+                            Level.FINE,
+                            "Error shutting down socket I/O (this is expected if the client disconnected already)",
+                            e);
+                    }
+                    LOG.log(Level.FINE, "Closing client socket");
                     socket.close();
+                    LOG.log(Level.FINE, "Finished tearing down client socket");
                 }
 
             } catch (Throwable t) {
-                // t.printStackTrace();
-                LOGGER.log(Level.SEVERE, t.getMessage(), t);
+                LOG.log(Level.WARNING, "Internal error in session", t);
             }
 
             ((ThreadLocalInputStream) System.in).init(null);
@@ -393,9 +399,11 @@ public class NGSession extends Thread {
 
             updateThreadName(null);
             sessionPool.give(this);
+            LOG.log(Level.FINE, "Waiting for next client to connect");
             socket = nextSocket();
         }
 
+        LOG.log(Level.INFO, "NGSession shutting down");
 //		server.out.println("Shutdown NGSession " + instanceNumber);
     }
 

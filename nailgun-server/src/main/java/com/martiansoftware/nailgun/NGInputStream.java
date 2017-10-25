@@ -34,6 +34,7 @@ import java.util.logging.Logger;
  */
 public class NGInputStream extends FilterInputStream implements Closeable {
 
+    private static final Logger LOG = Logger.getLogger(NGInputStream.class.getName());
     private final ExecutorService executor;
     private final DataInputStream din;
     private InputStream stdin = null;
@@ -89,10 +90,14 @@ public class NGInputStream extends FilterInputStream implements Closeable {
                         });
                         readHeaderFuture.get(heartbeatTimeoutMillis, TimeUnit.MILLISECONDS);
                     }
-                } catch (InterruptedException e) {
-                } catch (ExecutionException e) {
-                } catch (TimeoutException e) {
-                } finally {
+		 } catch (InterruptedException e) {
+		    LOG.log(Level.WARNING, "Nailgun client read future was interrupted", e);
+		 } catch (ExecutionException e) {
+		    LOG.log(Level.WARNING, "Nailgun client read future raised an exception", e);
+		 } catch (TimeoutException e) {
+		    LOG.log(Level.WARNING, "Nailgun client read future timed out after " + heartbeatTimeoutMillis + " ms", e);
+		 } finally {
+                    LOG.log(Level.FINE, "Nailgun client read shutting down");
                     notifyClientListeners(serverLog, mainThread);
                     readEof();
                     Thread.currentThread().setName(Thread.currentThread().getName() + " (idle)");
@@ -193,30 +198,34 @@ public class NGInputStream extends FilterInputStream implements Closeable {
             int hlen = din.readInt();
             byte chunkType = din.readByte();
             long readTime = System.currentTimeMillis();
-            long intervalMillis = readTime - lastReadTime;
 
             // Synchronize the remainder of the method on this object as it accesses internal state.
             synchronized (this) {
+                long intervalMillis = readTime - lastReadTime;
                 lastReadTime = readTime;
                 switch(chunkType) {
                     case NGConstants.CHUNKTYPE_STDIN:
                         if (remaining != 0) throw new IOException("Data received before stdin stream was emptied.");
+                        LOG.log(Level.FINE, "Got stdin chunk, len " + hlen);
                         remaining = hlen;
                         stdin = readPayload(in, hlen);
                         notify();
                         break;
 
                     case NGConstants.CHUNKTYPE_STDIN_EOF:
+                        LOG.log(Level.FINE, "Got stdin closed chunk");
                         readEof();
                         break;
 
                     case NGConstants.CHUNKTYPE_HEARTBEAT:
+                        LOG.log(Level.FINER, "Got client heartbeat");
                         for (Iterator i = heartbeatListeners.iterator(); i.hasNext();) {
                             ((NGHeartbeatListener) i.next()).heartbeatReceived(intervalMillis);
                         }
                         break;
 
                     default:
+                        LOG.log(Level.WARNING, "Unknown chunk type: " + (char) chunkType);
                         throw(new IOException("Unknown stream type: " + (char) chunkType));
                 }
             }
@@ -234,7 +243,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     /**
 	 * @see java.io.InputStream#available()
 	 */
-	public int available() throws IOException {
+	public synchronized int available() throws IOException {
 		if (eof) return(0);
 		if (stdin == null) return(0);
 		return stdin.available();
@@ -258,7 +267,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
 	/**
 	 * @see java.io.InputStream.read(byte[])
 	 */
-	public int read(byte[] b) throws IOException {
+	public synchronized int read(byte[] b) throws IOException {
 		return (read(b, 0, b.length));
 	}
 
@@ -302,7 +311,7 @@ public class NGInputStream extends FilterInputStream implements Closeable {
 	/**
 	 * @return true if interval since last read is less than heartbeat timeout interval.
 	 */
-	public boolean isClientConnected() {
+	public synchronized boolean isClientConnected() {
 	    long intervalMillis = System.currentTimeMillis() - lastReadTime;
 	    return intervalMillis < heartbeatTimeoutMillis;
 	}
