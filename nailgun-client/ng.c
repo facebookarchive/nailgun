@@ -24,6 +24,7 @@
 #ifdef WIN32
 	#include <direct.h>
 	#include <winsock2.h>
+        #include <io.h>
 #else
 	#include <arpa/inet.h>
 	#include <netdb.h>
@@ -828,17 +829,20 @@ int main(int argc, char *argv[], char *env[]) {
   /* now send environment */  
   sendText(CHUNKTYPE_ENV, NAILGUN_FILESEPARATOR);
   sendText(CHUNKTYPE_ENV, NAILGUN_PATHSEPARATOR);
-#ifndef WIN32
-  /* notify isatty for standard pipes */
-  for(i = 0; i < 3; i++) {
-    sprintf(isattybuf, NAILGUN_TTY_FORMAT, i, isatty(i));
-    sendText(CHUNKTYPE_ENV, isattybuf);
-  }
-#endif
   /* forward the client process environment */
   for(i = 0; env[i]; ++i) {
     sendText(CHUNKTYPE_ENV, env[i]);
   }
+  /* notify isatty for standard pipes */
+  for(i = 0; i < 3; i++) {
+#ifndef WIN32
+    sprintf(isattybuf, NAILGUN_TTY_FORMAT, i, isatty(i));
+#else
+    sprintf(isattybuf, NAILGUN_TTY_FORMAT, i, _isatty(i));
+#endif
+    sendText(CHUNKTYPE_ENV, isattybuf);
+  }
+
   
   /* now send the working directory */
   cwd = getcwd(NULL, 0);
