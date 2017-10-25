@@ -27,7 +27,9 @@ import java.lang.reflect.Method;
 import java.net.Socket;
 import java.util.List;
 import java.util.Properties;
+
 import java.util.concurrent.atomic.AtomicLong;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -39,9 +41,10 @@ import java.util.logging.Logger;
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class NGSession extends Thread {
-
+    /**
+	   * {@linkplain Logger} instance for this class.
+	   */
     private static final Logger LOG = Logger.getLogger(NGSession.class.getName());
-
     /**
      * The server this NGSession is working for
      */
@@ -252,7 +255,7 @@ public class NGSession extends Thread {
                 PrintStream exit = null;
 
                 try {
-                    in = new NGInputStream(sockin, sockout, server.out, heartbeatTimeoutMillis);
+                    in = new NGInputStream(sockin, sockout, server.getLogger(), heartbeatTimeoutMillis);
                     out = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDOUT));
                     err = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDERR));
                     exit = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_EXIT));
@@ -348,11 +351,12 @@ public class NGSession extends Thread {
                         LOG.log(Level.INFO, "Server cleanly exited with status " + exitEx.getStatus(), exitEx);
                         in.close();
                         exit.println(exitEx.getStatus());
-                        server.out.println(Thread.currentThread().getName() + " exited with status " + exitEx.getStatus());
+                        server.getLogger().log(Level.INFO, Thread.currentThread().getName() + " exited with status " + exitEx.getStatus());
                     } catch (Throwable t) {
                         LOG.log(Level.INFO, "Server unexpectedly exited with unhandled exception", t);
                         in.close();
-                        t.printStackTrace();
+                        // t.printStackTrace();
+                        LOGGER.log(Level.SEVERE, t.getMessage(), t);
                         exit.println(NGConstants.EXIT_EXCEPTION); // remote exception constant
                     }
                 } finally {
@@ -387,7 +391,6 @@ public class NGSession extends Thread {
 
             } catch (Throwable t) {
                 LOG.log(Level.WARNING, "Internal error in session", t);
-                t.printStackTrace();
             }
 
             ((ThreadLocalInputStream) System.in).init(null);
