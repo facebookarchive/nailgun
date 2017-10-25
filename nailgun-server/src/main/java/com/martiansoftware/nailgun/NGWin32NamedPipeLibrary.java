@@ -77,7 +77,10 @@ public interface NGWin32NamedPipeLibrary extends WinNT {
             boolean bManualReset,
             boolean bInitialState,
             String lpName);
-    boolean FlushFileBuffers(
-            HANDLE hObject);
+    int WaitForSingleObject(
+            HANDLE hHandle,
+            int dwMilliseconds
+    );
+
     int GetLastError();
 }

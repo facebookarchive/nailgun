@@ -8,11 +8,11 @@
 
     <name>nailgun-server</name>
     <description>
-        Nailgun is a client, protocol, and server for running Java programs from 
-        the command line without incurring the JVM startup overhead. Programs run 
-        in the server (which is implemented in Java), and are triggered by the 
+        Nailgun is a client, protocol, and server for running Java programs from
+        the command line without incurring the JVM startup overhead. Programs run
+        in the server (which is implemented in Java), and are triggered by the
         client (written in C), which handles all I/O.
-        
+
         This project contains the SERVER ONLY.
     </description>
     <url>http://martiansoftware.com/nailgun</url>
@@ -35,7 +35,7 @@
         <version>4.1.0</version>
       </dependency>
     </dependencies>
-    
+
     <build>
         <plugins>
             <plugin>
@@ -51,7 +51,30 @@
                     </archive>
                 </configuration>
             </plugin>
-        </plugins>  
+            <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-shade-plugin</artifactId>
+              <version>3.0.0</version>
+              <executions>
+                <execution>
+                  <phase>package</phase>
+                  <goals>
+                    <goal>shade</goal>
+                  </goals>
+                  <configuration>
+                    <shadedArtifactAttached>true</shadedArtifactAttached>
+                    <shadedClassifierName>uber</shadedClassifierName>
+                    <createDependencyReducedPom>false</createDependencyReducedPom>
+                    <transformers>
+                      <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                        <mainClass>com.martiansoftware.nailgun.NGServer</mainClass>
+                      </transformer>
+                    </transformers>
+                  </configuration>
+                </execution>
+              </executions>
+            </plugin>
+        </plugins>
     </build>
 
     <properties>
