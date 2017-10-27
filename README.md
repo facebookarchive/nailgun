@@ -20,6 +20,8 @@ The client is built using make.  From the project directory,
 "make && sudo make install" will do it.  To create the windows client
 you will additionally need to "make ng.exe".
 
+A ruby client is available through the [railgun](https://github.com/timuralp/railgun) project.
+
 For more information, see [the nailgun website](http://martiansoftware.com/nailgun/).
 
 
