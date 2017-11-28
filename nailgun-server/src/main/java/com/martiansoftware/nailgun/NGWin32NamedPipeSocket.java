@@ -117,17 +117,15 @@ public class NGWin32NamedPipeSocket extends Socket {
                 }
             }
 
-            IntByReference read = new IntByReference();
-            if (!API.GetOverlappedResult(handle, olap.getPointer(), read, true)) {
+            IntByReference r = new IntByReference();
+            if (!API.GetOverlappedResult(handle, olap.getPointer(), r, true)) {
                 int lastError = API.GetLastError();
                 throw new IOException("GetOverlappedResult() failed for read operation: " + lastError);
             }
-            if (read.getValue() != len) {
-                throw new IOException("ReadFile() read less bytes than requested");
-            }
-            byte[] byteArray = readBuffer.getByteArray(0, len);
-            System.arraycopy(byteArray, 0, b, off, len);
-            return len;
+            int actualLen = r.getValue();
+            byte[] byteArray = readBuffer.getByteArray(0, actualLen);
+            System.arraycopy(byteArray, 0, b, off, actualLen);
+            return actualLen;
         }
     }
 
