@@ -31,8 +31,10 @@ import java.nio.ByteBuffer;
 
 public class NGWin32NamedPipeSocket extends Socket {
     private static final NGWin32NamedPipeLibrary API = NGWin32NamedPipeLibrary.INSTANCE;
+    static final boolean DEFAULT_REQUIRE_STRICT_LENGTH = false;
     private final HANDLE handle;
     private final CloseCallback closeCallback;
+    private final boolean requireStrictLength;
     private final InputStream is;
     private final OutputStream os;
     private final HANDLE readerWaitable;
@@ -42,11 +44,19 @@ public class NGWin32NamedPipeSocket extends Socket {
         void onNamedPipeSocketClose(HANDLE handle) throws IOException;
     }
 
+    /**
+     * The doc for InputStream#read(byte[] b, int off, int len) states that
+     * "An attempt is made to read as many as len bytes, but a smaller number may be read."
+     * However, using requireStrictLength, NGWin32NamedPipeSocketInputStream can require that
+     * len matches up exactly the number of bytes to read.
+     */
     public NGWin32NamedPipeSocket(
             HANDLE handle,
-            CloseCallback closeCallback) throws IOException {
+            CloseCallback closeCallback,
+            boolean requireStrictLength) throws IOException {
         this.handle = handle;
         this.closeCallback = closeCallback;
+        this.requireStrictLength = requireStrictLength;
         this.readerWaitable = API.CreateEvent(null, true, false, null);
         if (readerWaitable == null) {
             throw new IOException("CreateEvent() failed ");
@@ -57,6 +67,12 @@ public class NGWin32NamedPipeSocket extends Socket {
         }
         this.is = new NGWin32NamedPipeSocketInputStream(handle);
         this.os = new NGWin32NamedPipeSocketOutputStream(handle);
+    }
+
+    public NGWin32NamedPipeSocket(
+            HANDLE handle,
+            CloseCallback closeCallback) throws IOException {
+        this(handle, closeCallback, DEFAULT_REQUIRE_STRICT_LENGTH);
     }
 
     @Override
@@ -117,17 +133,19 @@ public class NGWin32NamedPipeSocket extends Socket {
                 }
             }
 
-            IntByReference read = new IntByReference();
-            if (!API.GetOverlappedResult(handle, olap.getPointer(), read, true)) {
+            IntByReference r = new IntByReference();
+            if (!API.GetOverlappedResult(handle, olap.getPointer(), r, true)) {
                 int lastError = API.GetLastError();
                 throw new IOException("GetOverlappedResult() failed for read operation: " + lastError);
             }
-            if (read.getValue() != len) {
-                throw new IOException("ReadFile() read less bytes than requested");
+            int actualLen = r.getValue();
+            if (requireStrictLength && (actualLen != len)) {
+                throw new IOException("ReadFile() read less bytes than requested: expected " +
+                    len + " bytes, but read " + actualLen + " bytes");
             }
-            byte[] byteArray = readBuffer.getByteArray(0, len);
-            System.arraycopy(byteArray, 0, b, off, len);
-            return len;
+            byte[] byteArray = readBuffer.getByteArray(0, actualLen);
+            System.arraycopy(byteArray, 0, b, off, actualLen);
+            return actualLen;
         }
     }
 

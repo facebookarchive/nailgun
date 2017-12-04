@@ -415,7 +415,8 @@ public class NGServer implements Runnable {
                 }
             } else {
                 if (Platform.isWindows()) {
-                    serversocket = new NGWin32NamedPipeServerSocket(listeningAddress.getLocalAddress());
+                    boolean requireStrictLength = true;
+                    serversocket = new NGWin32NamedPipeServerSocket(listeningAddress.getLocalAddress(), requireStrictLength);
                 } else {
                     serversocket = new NGUnixDomainServerSocket(listeningAddress.getLocalAddress());
                 }
