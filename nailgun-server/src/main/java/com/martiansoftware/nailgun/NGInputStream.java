@@ -35,7 +35,8 @@ import java.util.logging.Logger;
 public class NGInputStream extends FilterInputStream implements Closeable {
 
     private static final Logger LOG = Logger.getLogger(NGInputStream.class.getName());
-    private final ExecutorService executor;
+    private final ExecutorService orchestratorExecutor;
+    private final ExecutorService readExecutor;
     private final DataInputStream din;
     private InputStream stdin = null;
     private boolean eof = false;
@@ -50,58 +51,83 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     private final int heartbeatTimeoutMillis;
 
     /**
-	 * Creates a new NGInputStream wrapping the specified InputStream.
-     * Also sets up a timer to periodically consume heartbeats sent from the client and
-     * call registered NGClientListeners if a client disconnection is detected.
+     * Creates a new NGInputStream wrapping the specified InputStream. Also sets up a timer to
+     * periodically consume heartbeats sent from the client and call registered NGClientListeners if
+     * a client disconnection is detected.
+     *
      * @param in the InputStream to wrap
      * @param out the OutputStream to which SENDINPUT chunks should be sent
      * @param serverLog the PrintStream to which server logging messages should be written
-     * @param heartbeatTimeoutMillis the interval between heartbeats before considering the client disconnected
+     * @param heartbeatTimeoutMillis the interval between heartbeats before considering the client
+     * disconnected
      */
     public NGInputStream(
-            InputStream in,
-            DataOutputStream out,
-            final PrintStream serverLog,
-            final int heartbeatTimeoutMillis) {
+        InputStream in,
+        DataOutputStream out,
+        final PrintStream serverLog,
+        final int heartbeatTimeoutMillis) {
         super(in);
         din = (DataInputStream) this.in;
         this.out = out;
         this.heartbeatTimeoutMillis = heartbeatTimeoutMillis;
-        final int threadCount = 2; // One to loop reading chunks by executing Runnables on a second with a timeout.
-        this.executor = Executors.newFixedThreadPool(threadCount);
+
+        /** Thread factory that overrides name and priority for executor threads */
+        final class NamedThreadFactory implements ThreadFactory {
+
+            private final String threadName;
+
+            public NamedThreadFactory(String threadName) {
+                this.threadName = threadName;
+            }
+
+            @Override
+            public Thread newThread(Runnable r) {
+                SecurityManager s = System.getSecurityManager();
+                ThreadGroup group =
+                    (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
+                Thread t = new Thread(group, r, this.threadName, 0);
+                if (t.isDaemon()) {
+                    t.setDaemon(false);
+                }
+                if (t.getPriority() != Thread.MAX_PRIORITY) {
+                    // warning - it may actually set lower priority if current thread group does not allow
+                    // higher priorities
+                    t.setPriority(Thread.MAX_PRIORITY);
+                }
+                return t;
+            }
+        }
 
         final Thread mainThread = Thread.currentThread();
-        readFuture = executor.submit(new Runnable(){
-            public void run() {
-                try {
-                    Thread.currentThread().setName(mainThread.getName() + " read stream thread (NGInputStream pool)");
-                    while(true) {
-                        Future readHeaderFuture = executor.submit(new Runnable(){
-                            public void run() {
-                                Thread.currentThread().setName(mainThread.getName() + " read chunk thread (NGInputStream pool)");
-                                try {
-                                    readChunk();
-                                } catch (IOException e) {
-                                    throw new RuntimeException(e);
-                                } finally {
-                                    Thread.currentThread().setName(Thread.currentThread().getName() + " (idle)");
-                                }
-                            }
-                        });
-                        readHeaderFuture.get(heartbeatTimeoutMillis, TimeUnit.MILLISECONDS);
-                    }
-		 } catch (InterruptedException e) {
-		    LOG.log(Level.WARNING, "Nailgun client read future was interrupted", e);
-		 } catch (ExecutionException e) {
-		    LOG.log(Level.WARNING, "Nailgun client read future raised an exception", e);
-		 } catch (TimeoutException e) {
-		    LOG.log(Level.WARNING, "Nailgun client read future timed out after " + heartbeatTimeoutMillis + " ms", e);
-		 } finally {
-                    LOG.log(Level.FINE, "Nailgun client read shutting down");
-                    notifyClientListeners(serverLog, mainThread);
-                    readEof();
-                    Thread.currentThread().setName(Thread.currentThread().getName() + " (idle)");
+        this.orchestratorExecutor = Executors.newSingleThreadExecutor(
+            new NamedThreadFactory(mainThread.getName() + " (NGInputStream orchestrator)"));
+        this.readExecutor = Executors.newSingleThreadExecutor(
+            new NamedThreadFactory(mainThread.getName() + " (NGInputStream reader)"));
+
+        readFuture = orchestratorExecutor.submit(() -> {
+            try {
+                while (true) {
+                    Future readHeaderFuture = readExecutor.submit(() -> {
+                        try {
+                            readChunk();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+                    readHeaderFuture.get(heartbeatTimeoutMillis, TimeUnit.MILLISECONDS);
                 }
+            } catch (InterruptedException e) {
+                LOG.log(Level.WARNING, "Nailgun client read future was interrupted", e);
+            } catch (ExecutionException e) {
+                LOG.log(Level.WARNING, "Nailgun client read future raised an exception", e);
+            } catch (TimeoutException e) {
+                LOG.log(Level.WARNING,
+                    "Nailgun client read future timed out after " + heartbeatTimeoutMillis + " ms",
+                    e);
+            } finally {
+                LOG.log(Level.FINE, "Nailgun client read shutting down");
+                notifyClientListeners(serverLog, mainThread);
+                readEof();
             }
         });
     }
@@ -158,8 +184,10 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      */
     public synchronized void close() {
         readEof();
-		readFuture.cancel(true);
-        executor.shutdownNow();
+        //TODO(buck_team): graceful shutdown
+        readFuture.cancel(true);
+        readExecutor.shutdownNow();
+        orchestratorExecutor.shutdownNow();
 	}
 
     /**
@@ -205,28 +233,31 @@ public class NGInputStream extends FilterInputStream implements Closeable {
                 lastReadTime = readTime;
                 switch(chunkType) {
                     case NGConstants.CHUNKTYPE_STDIN:
-                        if (remaining != 0) throw new IOException("Data received before stdin stream was emptied.");
-                        LOG.log(Level.FINE, "Got stdin chunk, len " + hlen);
+                        if (remaining != 0) {
+                            throw new IOException("Data received before stdin stream was emptied");
+                        }
+                        LOG.log(Level.FINEST, "Got stdin chunk, len %d", hlen);
                         remaining = hlen;
                         stdin = readPayload(in, hlen);
                         notify();
                         break;
 
                     case NGConstants.CHUNKTYPE_STDIN_EOF:
-                        LOG.log(Level.FINE, "Got stdin closed chunk");
+                        LOG.log(Level.FINEST, "Got stdin closed chunk");
                         readEof();
                         break;
 
                     case NGConstants.CHUNKTYPE_HEARTBEAT:
-                        LOG.log(Level.FINER, "Got client heartbeat");
+                        LOG.log(Level.FINEST, "Got client heartbeat");
+                        // TODO(buck_team): should probably dispatch to a different thread(pool)
                         for (Iterator i = heartbeatListeners.iterator(); i.hasNext();) {
                             ((NGHeartbeatListener) i.next()).heartbeatReceived(intervalMillis);
                         }
                         break;
 
                     default:
-                        LOG.log(Level.WARNING, "Unknown chunk type: " + (char) chunkType);
-                        throw(new IOException("Unknown stream type: " + (char) chunkType));
+                        LOG.log(Level.WARNING, "Unknown chunk type: %c", (char) chunkType);
+                        throw new IOException("Unknown stream type: " + (char) chunkType);
                 }
             }
         }
@@ -265,14 +296,14 @@ public class NGInputStream extends FilterInputStream implements Closeable {
 	}
 
 	/**
-	 * @see java.io.InputStream.read(byte[])
+	 * @see java.io.InputStream#read(byte[])
 	 */
 	public synchronized int read(byte[] b) throws IOException {
 		return (read(b, 0, b.length));
 	}
 
 	/**
-	 * @see java.io.InputStream.read(byte[],offset,length)
+	 * @see java.io.InputStream#read(byte[], int, int)
 	 */
 	public synchronized int read(byte[] b, int offset, int length) throws IOException {
 		if (!started) {
