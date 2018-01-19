@@ -11,13 +11,6 @@ import sys
 from pynailgun import NailgunException, NailgunConnection
 
 
-POSSIBLE_NAILGUN_CODES_ON_NG_STOP = [
-    NailgunException.CONNECT_FAILED,
-    NailgunException.CONNECTION_BROKEN,
-    NailgunException.UNEXPECTED_CHUNKTYPE,
-]
-
-
 if os.name == 'posix':
     def transport_exists(transport_file):
         return os.path.exists(transport_file)
@@ -55,8 +48,14 @@ class TestNailgunConnection(unittest.TestCase):
             self.transport_address = u'local:{0}'.format(pipe_name)
             self.transport_file = ur'\\.\pipe\{0}'.format(pipe_name)
 
-    def getNailgunUberJar(self):
-        return 'nailgun-server/target/nailgun-server-0.9.2-SNAPSHOT-uber.jar'
+    def getClassPath(self):
+        cp = [
+            'nailgun-server/target/nailgun-server-0.9.3-SNAPSHOT-uber.jar',
+            'nailgun-examples/target/nailgun-examples-0.9.3-SNAPSHOT.jar',
+            ]
+        if os.name == 'nt':
+            return ';'.join(cp)
+        return ':'.join(cp)
 
     def startNailgun(self):
         if os.name == 'posix':
@@ -78,8 +77,14 @@ class TestNailgunConnection(unittest.TestCase):
         stdout = None
         if os.name == 'posix':
             stdout=subprocess.PIPE
+
+        cmd = ['java', '-Djna.nosys=true', '-classpath', self.getClassPath()]
+        if os.environ.get('DEBUG_MODE') == '1':
+            cmd.append('-agentlib:jdwp=transport=dt_socket,address=localhost:8888,server=y,suspend=y')
+        cmd = cmd + ['com.martiansoftware.nailgun.NGServer', self.transport_address]
+
         self.ng_server_process = subprocess.Popen(
-            ['java', '-Djna.nosys=true', '-jar', self.getNailgunUberJar(), self.transport_address],
+            cmd,
             preexec_fn=preexec_fn,
             creationflags=creationflags,
             stdout=stdout,
@@ -89,8 +94,12 @@ class TestNailgunConnection(unittest.TestCase):
 
         if os.name == 'posix':
             # on *nix we have to wait for server to be ready to accept connections
-            the_first_line = self.ng_server_process.stdout.readline().strip()
-            self.assertTrue("NGServer" in the_first_line and "started" in the_first_line, "Got a line: {0}".format(the_first_line))
+            while True:
+                the_first_line = self.ng_server_process.stdout.readline().strip()
+                if "NGServer" in the_first_line and "started" in the_first_line:
+                    break
+                if the_first_line is None or the_first_line == '':
+                    break
         else:
             for _ in range(0, 600):
                 # on windows it is OK to rely on existence of the pipe file
@@ -101,43 +110,80 @@ class TestNailgunConnection(unittest.TestCase):
 
         self.assertTrue(transport_exists(self.transport_file))
 
-    def test_nailgun_stats_and_stop(self):
-        for i in range(1, 5):
-            output = StringIO.StringIO()
-            with NailgunConnection(
-                    self.transport_address,
-                    stderr=None,
-                    stdin=None,
-                    stdout=output) as c:
-                exit_code = c.send_command('ng-stats')
-                self.assertEqual(exit_code, 0)
-            actual_out = output.getvalue().strip()
-            expected_out = 'com.martiansoftware.nailgun.builtins.NGServerStats: {0}/1'.format(i)
-            self.assertEqual(actual_out, expected_out)
+    def test_nailgun_stats(self):
+        output = StringIO.StringIO()
+        with NailgunConnection(
+                self.transport_address,
+                stderr=None,
+                stdin=None,
+                stdout=output) as c:
+            exit_code = c.send_command('ng-stats')
+        self.assertEqual(exit_code, 0)
+        actual_out = output.getvalue().strip()
+        expected_out = 'com.martiansoftware.nailgun.builtins.NGServerStats: 1/1'
+        self.assertEqual(actual_out, expected_out)
 
-        try:
-            with NailgunConnection(
-                    self.transport_address,
-                    cwd=os.getcwd(),
-                    stderr=None,
-                    stdin=None,
-                    stdout=None) as c:
-                c.send_command('ng-stop')
-        except NailgunException as e:
-            self.assertIn(e.code, POSSIBLE_NAILGUN_CODES_ON_NG_STOP)
+    def test_nailgun_exit_code(self):
+        output = StringIO.StringIO()
+        expected_exit_code = 10
+        with NailgunConnection(
+                self.transport_address,
+                stderr=None,
+                stdin=None,
+                stdout=output) as c:
+            exit_code = c.send_command('com.martiansoftware.nailgun.examples.Exit', [str(expected_exit_code)])
+        self.assertEqual(exit_code, expected_exit_code)
 
-        self.ng_server_process.wait()
-        self.assertEqual(self.ng_server_process.poll(), 0)
+    def test_nailgun_stdin(self):
+        lines = [str(i) for i in range(100)]
+        echo = '\n'.join(lines)
+        output = StringIO.StringIO()
+        input = StringIO.StringIO(echo)
+        with NailgunConnection(
+                self.transport_address,
+                stderr=None,
+                stdin=input,
+                stdout=output) as c:
+            exit_code = c.send_command('com.martiansoftware.nailgun.examples.Echo')
+        self.assertEqual(exit_code, 0)
+        actual_out = output.getvalue().strip()
+        self.assertEqual(actual_out, echo)
+
+    def test_nailgun_default_streams(self):
+        with NailgunConnection(self.transport_address) as c:
+            exit_code = c.send_command('ng-stats')
+        self.assertEqual(exit_code, 0)
 
     def tearDown(self):
-        if self.ng_server_process.poll() is None:
+        try:
+            with NailgunConnection(
+                self.transport_address,
+                cwd=os.getcwd(),
+                stderr=None,
+                stdin=None,
+                stdout=None) as c:
+                c.send_command('ng-stop')
+        except NailgunException as e:
+            # stopping server is a best effort
+            # if something wrong has happened, we will kill it anyways
+            pass
+
+        # Python2 compatible wait with timeout
+        process_exit_code = None
+        for _ in range(0, 500):
+            process_exit_code = self.ng_server_process.poll()
+            if process_exit_code is not None:
+                break
+            time.sleep(0.02)   # 1 second total
+
+        if process_exit_code is None:
             # some test has failed, ng-server was not stopped. killing it
             self.ng_server_process.kill()
         shutil.rmtree(self.tmpdir)
 
 
 if __name__ == '__main__':
-    for i in range(50):
+    for i in range(10):
         was_successful = unittest.main(exit=False).result.wasSuccessful()
         if not was_successful:
             sys.exit(1)

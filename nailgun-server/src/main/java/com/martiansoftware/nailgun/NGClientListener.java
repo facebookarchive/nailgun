@@ -4,8 +4,7 @@ public interface NGClientListener {
 
     /**
      * Called by an internal nailgun thread when the server detects that the nailgun client has disconnected.
-     * {@link NGClientListener}s can be registered using {@link NGContext.registerClientListener}. If
-     * clientDisconnected throws an InterruptedException nailgun interrupts the main session thread.
+     * {@link NGClientListener}s can be registered using {@link NGContext#addClientListener}.
      */
-    public void clientDisconnected() throws InterruptedException;
+    void clientDisconnected();
 }

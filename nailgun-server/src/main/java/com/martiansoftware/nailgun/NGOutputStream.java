@@ -50,7 +50,7 @@ class NGOutputStream extends java.io.DataOutputStream {
 	}
 	
 	/**
-	 * @see java.io.OutputStream.write(byte[])
+	 * @see java.io.OutputStream#write(byte[])
 	 */
 	public void write(byte[] b) throws IOException {
 		throwIfClosed();
@@ -58,7 +58,7 @@ class NGOutputStream extends java.io.DataOutputStream {
 	}
 	
 	/**
-	 * @see java.io.OutputStream.write(int)
+	 * @see java.io.OutputStream#write(int)
 	 */
 	public void write(int b) throws IOException {
 		throwIfClosed();
@@ -67,7 +67,7 @@ class NGOutputStream extends java.io.DataOutputStream {
 	}
 	
 	/**
-	 * @see java.io.OutputStream.write(byte[],int,int)
+	 * @see java.io.OutputStream#write(byte[],int,int)
 	 */
 	public void write(byte[] b, int offset, int len) throws IOException {
 		throwIfClosed();
@@ -80,7 +80,7 @@ class NGOutputStream extends java.io.DataOutputStream {
 	}
 
 	/**
-	 * @see java.io.OutputStream.close()
+	 * @see java.io.OutputStream#close()
 	 *
 	 * Implement an empty close function, to allow the client to close
 	 * the stdout and/or stderr, without this closing the connection
@@ -96,7 +96,7 @@ class NGOutputStream extends java.io.DataOutputStream {
 	}
 
 	/**
-	 * @see java.io.OutputStream.flush()
+	 * @see java.io.OutputStream#flush()
 	 */
 	public void flush() throws IOException {
 		throwIfClosed();

@@ -25,6 +25,7 @@ import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
@@ -119,7 +120,6 @@ public class NGSession extends Thread {
         this.server = server;
         this.heartbeatTimeoutMillis = server.getHeartbeatTimeout();
         this.instanceNumber = instanceCounter.incrementAndGet();
-//		server.out.println("Created NGSession " + instanceNumber);
     }
 
     /**
@@ -155,7 +155,7 @@ public class NGSession extends Thread {
      * <code>null</code> if the NGSession has been shut down.
      */
     private Socket nextSocket() {
-        Socket result = null;
+        Socket result;
         synchronized (lock) {
             result = nextSocket;
             while (!done && result == null) {
@@ -168,7 +168,22 @@ public class NGSession extends Thread {
             }
             nextSocket = null;
         }
-        return (result);
+
+        if (result != null) {
+            // Java InputStream API is blocking by default with no reliable way to stop pending
+            // read() call. Setting the timeout to underlying socket will make socket's underlying
+            // read() calls throw SocketTimeoutException which unblocks read(). The exception must
+            // be properly handled by calling code.
+            try {
+                result.setSoTimeout(this.heartbeatTimeoutMillis);
+            } catch (SocketException e) {
+                // this exception might be thrown if socket is already closed
+                // so we just return null
+                return null;
+            }
+        }
+
+        return result;
     }
 
     /**
@@ -246,17 +261,12 @@ public class NGSession extends Thread {
                 // can't create NGInputStream until we've received a command, because at
                 // that point the stream from the client will only include stdin and stdin-eof
                 // chunks
-                InputStream in = null;
-                PrintStream out = null;
-                PrintStream err = null;
-                PrintStream exit = null;
-
-                try {
-                    in = new NGInputStream(sockin, sockout, server.out, heartbeatTimeoutMillis);
-                    out = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDOUT));
-                    err = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDERR));
-                    exit = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_EXIT));
-
+                try (
+                    InputStream in = new NGInputStream(sockin, sockout, heartbeatTimeoutMillis);
+                    PrintStream out = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDOUT));
+                    PrintStream err = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDERR));
+                    PrintStream exit = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_EXIT));
+                ) {
                     // ThreadLocal streams for System.in/out/err redirection
                     ((ThreadLocalInputStream) System.in).init(in);
                     ((ThreadLocalPrintStream) System.out).init(out);
@@ -346,29 +356,14 @@ public class NGSession extends Thread {
 
                     } catch (NGExitException exitEx) {
                         LOG.log(Level.INFO, "Server cleanly exited with status " + exitEx.getStatus(), exitEx);
-                        in.close();
                         exit.println(exitEx.getStatus());
                         server.out.println(Thread.currentThread().getName() + " exited with status " + exitEx.getStatus());
                     } catch (Throwable t) {
                         LOG.log(Level.INFO, "Server unexpectedly exited with unhandled exception", t);
-                        in.close();
                         t.printStackTrace();
                         exit.println(NGConstants.EXIT_EXCEPTION); // remote exception constant
                     }
                 } finally {
-                    LOG.log(Level.FINE, "Tearing down client socket");
-                    if (in != null) {
-                        in.close();
-                    }
-                    if (out != null) {
-                        out.close();
-                    }
-                    if (err != null) {
-                        err.close();
-                    }
-                    if (exit != null) {
-                        exit.close();
-                    }
                     LOG.log(Level.FINE, "Flushing client socket");
                     sockout.flush();
                     try {
@@ -401,7 +396,6 @@ public class NGSession extends Thread {
         }
 
         LOG.log(Level.INFO, "NGSession shutting down");
-//		server.out.println("Shutdown NGSession " + instanceNumber);
     }
 
     /**

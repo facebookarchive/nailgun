@@ -19,17 +19,19 @@
 package com.martiansoftware.nailgun;
 
 import java.io.*;
+import java.net.SocketTimeoutException;
+import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * A FilterInputStream that is able to read the chunked stdin stream
- * from a NailGun client.
- * 
+ * A FilterInputStream that is able to read the chunked stdin stream from a NailGun client.
+ *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class NGInputStream extends FilterInputStream implements Closeable {
@@ -40,15 +42,14 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     private final DataInputStream din;
     private InputStream stdin = null;
     private boolean eof = false;
-    private long remaining = 0;
+    private boolean clientConnected = true;
+    private int remaining = 0;
     private byte[] oneByteBuffer = null;
     private final DataOutputStream out;
     private boolean started = false;
-    private long lastReadTime = System.currentTimeMillis();
-    private final Future readFuture;
-    private final Set clientListeners = new HashSet();
-    private final Set heartbeatListeners = new HashSet();
-    private final int heartbeatTimeoutMillis;
+    private final Set<NGClientListener> clientListeners = new HashSet<>();
+    private final Set<NGHeartbeatListener> heartbeatListeners = new HashSet<>();
+    private static final long TERMINATION_TIMEOUT_MS = 1000;
 
     /**
      * Creates a new NGInputStream wrapping the specified InputStream. Also sets up a timer to
@@ -57,19 +58,16 @@ public class NGInputStream extends FilterInputStream implements Closeable {
      *
      * @param in the InputStream to wrap
      * @param out the OutputStream to which SENDINPUT chunks should be sent
-     * @param serverLog the PrintStream to which server logging messages should be written
      * @param heartbeatTimeoutMillis the interval between heartbeats before considering the client
      * disconnected
      */
     public NGInputStream(
-        InputStream in,
+        DataInputStream in,
         DataOutputStream out,
-        final PrintStream serverLog,
         final int heartbeatTimeoutMillis) {
         super(in);
-        din = (DataInputStream) this.in;
+        this.din = in;
         this.out = out;
-        this.heartbeatTimeoutMillis = heartbeatTimeoutMillis;
 
         /** Thread factory that overrides name and priority for executor threads */
         final class NamedThreadFactory implements ThreadFactory {
@@ -98,106 +96,140 @@ public class NGInputStream extends FilterInputStream implements Closeable {
             }
         }
 
-        final Thread mainThread = Thread.currentThread();
+        Thread mainThread = Thread.currentThread();
         this.orchestratorExecutor = Executors.newSingleThreadExecutor(
             new NamedThreadFactory(mainThread.getName() + " (NGInputStream orchestrator)"));
         this.readExecutor = Executors.newSingleThreadExecutor(
             new NamedThreadFactory(mainThread.getName() + " (NGInputStream reader)"));
 
-        readFuture = orchestratorExecutor.submit(() -> {
+        // Read timeout, including heartbeats, should be handled by socket.
+        // However Java Socket/Stream API does not enforce that. To stay on safer side,
+        // use timeout on a future
+
+        // let socket timeout first, set rough timeout to 110% of original
+        long futureTimeout = heartbeatTimeoutMillis + heartbeatTimeoutMillis / 10;
+
+        orchestratorExecutor.submit(() -> {
             try {
-                while (true) {
-                    Future readHeaderFuture = readExecutor.submit(() -> {
+                boolean isMoreData = true;
+                while (isMoreData) {
+                    Future<Boolean> readFuture = readExecutor.submit(() -> {
                         try {
+                            // return false if client sends EOF
                             readChunk();
+                            return true;
+                        } catch (EOFException e) {
+                            // EOFException means that underlying stream is closed by the server
+                            // There will be no more data and it is time to close the circus
+                            return false;
                         } catch (IOException e) {
-                            throw new RuntimeException(e);
+                            throw new ExecutionException(e);
                         }
                     });
-                    readHeaderFuture.get(heartbeatTimeoutMillis, TimeUnit.MILLISECONDS);
+
+                    isMoreData = readFuture.get(futureTimeout, TimeUnit.MILLISECONDS);
                 }
             } catch (InterruptedException e) {
                 LOG.log(Level.WARNING, "Nailgun client read future was interrupted", e);
             } catch (ExecutionException e) {
-                LOG.log(Level.WARNING, "Nailgun client read future raised an exception", e);
+                Throwable cause = e.getCause();
+                if (cause != null && cause instanceof SocketTimeoutException) {
+                    LOG.log(Level.WARNING,
+                        "Nailgun client socket timed out after " + heartbeatTimeoutMillis + " ms",
+                        cause);
+                } else {
+                    LOG.log(Level.WARNING, "Nailgun client read future raised an exception", e);
+                }
             } catch (TimeoutException e) {
                 LOG.log(Level.WARNING,
-                    "Nailgun client read future timed out after " + heartbeatTimeoutMillis + " ms",
+                    "Nailgun client read future timed out after " + futureTimeout + " ms",
                     e);
             } finally {
                 LOG.log(Level.FINE, "Nailgun client read shutting down");
-                notifyClientListeners(serverLog, mainThread);
-                readEof();
+
+                // notify stream readers there are no more data
+                setEof();
+
+                // set client disconnected flag
+                setClientDisconnected();
+
+                // notify listeners that client has disconnected
+                notifyClientListeners();
             }
         });
     }
 
     /**
-     * Calls clientDisconnected method on given NGClientListener.
-     * If the clientDisconnected method throws an NGExitException due to calling System.exit() it is
-     * rethrown as an InterruptedException.
-     * @param listener The NGClientListener to notify.
-     */
-    private synchronized void notifyClientListener(NGClientListener listener) throws InterruptedException {
-        try {
-            listener.clientDisconnected();
-        } catch (NGExitException e) {
-            throw new InterruptedException(e.getMessage());
-        }
-    }
-
-    /**
-     * Calls clientDisconnected method on given NGClientListener.
-     * If the clientDisconnected method calls System.exit() or throws an InterruptedException, the given
-     * mainThread is interrupted.
-     * @param listener The NGClientListener to notify.
-     * @param mainThread The Thread to interrupt.
-     */
-    private synchronized void notifyClientListener(NGClientListener listener, Thread mainThread) {
-        try {
-            notifyClientListener(listener);
-        } catch (InterruptedException e) {
-            mainThread.interrupt();
-        }
-    }
-
-    /**
      * Calls clientDisconnected method on all registered NGClientListeners.
-     * If any of the clientDisconnected methods throw an NGExitException due to calling System.exit()
-     * clientDisconnected processing is halted, the exit status is printed to the serverLog and the main
-     * thread is interrupted.
-     * @param serverLog The NailGun server log stream.
-     * @param mainThread The thread running nailMain which should be interrupted on System.exit()
      */
-    private synchronized void notifyClientListeners(PrintStream serverLog, Thread mainThread) {
-        if (! eof) {
-            serverLog.println(mainThread.getName() + " disconnected");
-            for (Iterator i = clientListeners.iterator(); i.hasNext(); ) {
-                notifyClientListener((NGClientListener) i.next(), mainThread);
-            }
+    private void notifyClientListeners() {
+        // copy collection under monitor to avoid blocking monitor on potentially expensive
+        // callbacks
+        List<NGClientListener> listeners;
+        synchronized (this) {
+            listeners = new ArrayList<>(clientListeners);
+            clientListeners.clear();
         }
-        clientListeners.clear();
+
+        for (NGClientListener listener : listeners) {
+            listener.clientDisconnected();
+        }
     }
 
     /**
-     * Cancels the thread reading from the NailGun client.
+     * Cancel the thread reading from the NailGun client and close underlying input stream
      */
-    public synchronized void close() {
-        readEof();
-        //TODO(buck_team): graceful shutdown
-        readFuture.cancel(true);
-        readExecutor.shutdownNow();
-        orchestratorExecutor.shutdownNow();
-	}
+    public void close() throws IOException {
+        setEof();
+
+        // this will close `in` and trigger any in.read() calls from readExecutor to unblock
+        super.close();
+
+        // the order or termination is important because readExecutor will send a completion
+        // signal to orchestratorExecutor
+        terminateExecutor(readExecutor, "read");
+        terminateExecutor(orchestratorExecutor, "orchestrator");
+    }
+
+    private static void terminateExecutor(ExecutorService service, String which) {
+        LOG.log(Level.FINE, "Shutting down {0} ExecutorService", which);
+        service.shutdown();
+
+        boolean terminated = false;
+        try {
+            terminated = service
+                .awaitTermination(TERMINATION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            // It can happen if a thread calling close() is already interrupted
+            // do not do anything here but do hard shutdown later with shutdownNow()
+            // It is calling thread's responsibility to not be in interrupted state
+            LOG.log(Level.WARNING,
+                "Interruption is signaled in close(), terminating a thread forcefully");
+            service.shutdownNow();
+            return;
+        }
+
+        if (!terminated) {
+            // something went wrong, executor task did not receive a signal and did not complete on time
+            // shot executor in the head then
+            LOG.log(Level.WARNING,
+                "{0} thread did not unblock on a signal within timeout and will be"
+                    + " forcefully terminated",
+                which);
+            service.shutdownNow();
+        }
+    }
 
     /**
      * Reads a NailGun chunk payload from {@link #in} and returns an InputStream that reads from
      * that chunk.
+     *
      * @param in the InputStream to read the chunk payload from.
      * @param len the size of the payload chunk read from the chunkHeader.
      * @return an InputStream containing the read data.
-     * @throws IOException if thrown by the underlying InputStream,
-     * or if the stream EOF is reached before the payload has been read.
+     * @throws IOException if thrown by the underlying InputStream
+     * @throws EOFException if EOF is reached by underlying stream
+     * before the payload has been read.
      */
     private InputStream readPayload(InputStream in, int len) throws IOException {
 
@@ -206,7 +238,10 @@ public class NGInputStream extends FilterInputStream implements Closeable {
         while (totalRead < len) {
             int currentRead = in.read(receiveBuffer, totalRead, len - totalRead);
             if (currentRead < 0) {
-                throw new IOException("stdin EOF before payload read.");
+                // server may forcefully close the socket/stream and this will cause InputStream to
+                // return -1. Throw EOFException (same what DataInputStream does) to signal up
+                // that we are in shutdown mode
+                throw new EOFException("stdin EOF before payload read.");
             }
             totalRead += currentRead;
         }
@@ -216,154 +251,188 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     /**
      * Reads a NailGun chunk header from the underlying InputStream.
      *
-     * @throws IOException if thrown by the underlying InputStream,
-     * or if an unexpected NailGun chunk type is encountered.
+     * @throws EOFException if underlying stream / socket is closed which happens on client
+     * disconnection
+     * @throws IOException if thrown by the underlying InputStream, or if an unexpected NailGun
+     * chunk type is encountered.
      */
     private void readChunk() throws IOException {
+        int chunkLen = din.readInt();
+        byte chunkType = din.readByte();
+        long readTime = System.currentTimeMillis();
 
-        // Synchronize on the input stream to avoid blocking other threads while waiting for chunk headers.
-        synchronized (this.din) {
-            int hlen = din.readInt();
-            byte chunkType = din.readByte();
-            long readTime = System.currentTimeMillis();
-
-            // Synchronize the remainder of the method on this object as it accesses internal state.
-            synchronized (this) {
-                long intervalMillis = readTime - lastReadTime;
-                lastReadTime = readTime;
-                switch(chunkType) {
-                    case NGConstants.CHUNKTYPE_STDIN:
-                        if (remaining != 0) {
-                            throw new IOException("Data received before stdin stream was emptied");
-                        }
-                        LOG.log(Level.FINEST, "Got stdin chunk, len %d", hlen);
-                        remaining = hlen;
-                        stdin = readPayload(in, hlen);
-                        notify();
-                        break;
-
-                    case NGConstants.CHUNKTYPE_STDIN_EOF:
-                        LOG.log(Level.FINEST, "Got stdin closed chunk");
-                        readEof();
-                        break;
-
-                    case NGConstants.CHUNKTYPE_HEARTBEAT:
-                        LOG.log(Level.FINEST, "Got client heartbeat");
-                        // TODO(buck_team): should probably dispatch to a different thread(pool)
-                        for (Iterator i = heartbeatListeners.iterator(); i.hasNext();) {
-                            ((NGHeartbeatListener) i.next()).heartbeatReceived(intervalMillis);
-                        }
-                        break;
-
-                    default:
-                        LOG.log(Level.WARNING, "Unknown chunk type: %c", (char) chunkType);
-                        throw new IOException("Unknown stream type: " + (char) chunkType);
+        switch (chunkType) {
+            case NGConstants.CHUNKTYPE_STDIN:
+                InputStream chunkStream = readPayload(in, chunkLen);
+                synchronized (this) {
+                    if (remaining != 0) {
+                        // TODO(buck_team) have better passthru streaming and remove this
+                        // limitation
+                        throw new IOException("Data received before stdin stream was emptied");
+                    }
+                    LOG.log(Level.FINEST, "Got stdin chunk, len {0}", chunkLen);
+                    stdin = chunkStream;
+                    remaining = chunkLen;
+                    notifyAll();
                 }
-            }
+                break;
+
+            case NGConstants.CHUNKTYPE_STDIN_EOF:
+                LOG.log(Level.FINEST, "Got stdin closed chunk");
+                setEof();
+                break;
+
+            case NGConstants.CHUNKTYPE_HEARTBEAT:
+                LOG.log(Level.FINEST, "Got client heartbeat");
+
+                ArrayList<NGHeartbeatListener> listeners;
+                synchronized (this) {
+                    // copy collection to avoid executing callbacks under lock
+                    listeners = new ArrayList<>(heartbeatListeners);
+                }
+
+                // TODO(buck_team): should probably dispatch to a different thread(pool)
+                for (NGHeartbeatListener listener : listeners) {
+                    listener.heartbeatReceived();
+                }
+
+                break;
+
+            default:
+                LOG.log(Level.WARNING, "Unknown chunk type: {0}", (char) chunkType);
+                throw new IOException("Unknown stream type: " + (char) chunkType);
         }
     }
 
     /**
-     * Notify threads waiting in waitForChunk on either EOF chunk read or client disconnection.
+     * Notify threads waiting in read() on either EOF chunk read or client disconnection.
      */
-    private synchronized void readEof() {
+    private synchronized void setEof() {
         eof = true;
         notifyAll();
     }
 
     /**
-	 * @see java.io.InputStream#available()
-	 */
-	public synchronized int available() throws IOException {
-		if (eof) return(0);
-		if (stdin == null) return(0);
-		return stdin.available();
-	}
-
-	/**
-	 * @see java.io.InputStream#markSupported()
-	 */
-	public boolean markSupported() {
-		return (false);
-	}
-
-	/**
-	 * @see java.io.InputStream#read()
-	 */
-	public synchronized int read() throws IOException {
-		if (oneByteBuffer == null) oneByteBuffer = new byte[1];
-		return((read(oneByteBuffer, 0, 1) == -1) ? -1 : (int) oneByteBuffer[0]);
-	}
-
-	/**
-	 * @see java.io.InputStream#read(byte[])
-	 */
-	public synchronized int read(byte[] b) throws IOException {
-		return (read(b, 0, b.length));
-	}
-
-	/**
-	 * @see java.io.InputStream#read(byte[], int, int)
-	 */
-	public synchronized int read(byte[] b, int offset, int length) throws IOException {
-		if (!started) {
-			sendSendInput();
-		}
-
-        waitForChunk();
-        if (eof) return(-1);
-
-		int bytesToRead = Math.min((int) remaining, length);
-		int result = stdin.read(b, offset, bytesToRead);
-		remaining -= result;
-		if (remaining == 0) sendSendInput();
-		return (result);
-	}
+     * Notify threads waiting in read() on either EOF chunk read or client disconnection.
+     */
+    private synchronized void setClientDisconnected() {
+        clientConnected = false;
+    }
 
     /**
-     * If EOF chunk has not been received, but no data is available, block until data is received, EOF or disconnection.
-     * @throws IOException which just wraps InterruptedExceptions thrown by wait.
+     * @see java.io.InputStream#available()
      */
-    private synchronized void waitForChunk() throws IOException {
-        try {
-            if((! eof) && (remaining == 0)) wait();
-        } catch (InterruptedException e) {
-            throw new IOException(e);
+    public synchronized int available() throws IOException {
+        if (eof) {
+            return 0;
         }
+        if (stdin == null) {
+            return 0;
+        }
+        return stdin.available();
     }
 
-    private synchronized void sendSendInput() throws IOException {
-        synchronized(out) {
-          out.writeInt(0);
-          out.writeByte(NGConstants.CHUNKTYPE_SENDINPUT);
+    /**
+     * @see java.io.InputStream#markSupported()
+     */
+    public boolean markSupported() {
+        return false;
+    }
+
+    /**
+     * @see java.io.InputStream#read()
+     */
+    public synchronized int read() throws IOException {
+        if (oneByteBuffer == null) {
+            oneByteBuffer = new byte[1];
+        }
+        return read(oneByteBuffer, 0, 1) == -1 ? -1 : (int) oneByteBuffer[0];
+    }
+
+    /**
+     * @see java.io.InputStream#read(byte[])
+     */
+    public synchronized int read(byte[] b) throws IOException {
+        return read(b, 0, b.length);
+    }
+
+    /**
+     * @see java.io.InputStream#read(byte[], int, int)
+     */
+    public synchronized int read(byte[] b, int offset, int length) throws IOException {
+        if (!started) {
+            sendSendInput();
+            started = true;
+        }
+
+        if (remaining == 0) {
+            if (eof) {
+                return -1;
+            }
+
+            try {
+                // wait for monitor to signal for either new data packet or eof (termination)
+                wait();
+            } catch (InterruptedException e) {
+                // this is a signal to stop listening and close
+                // it should never trigger this code path as we always explicitly unblock monitor
+                return -1;
+            }
+        }
+
+        if (remaining == 0) {
+            // still no data, stream/socket is probably terminated; return -1
+            return -1;
+        }
+
+        int bytesToRead = Math.min(remaining, length);
+        int result = stdin.read(b, offset, bytesToRead);
+        remaining -= result;
+        if (remaining == 0) {
+            sendSendInput();
+        }
+
+        return result;
+    }
+
+    private void sendSendInput() throws IOException {
+        // Need to synchronize out because some other thread may write to out too at the same time
+        // hopefully this 'other thread' will synchronize on 'out' as well
+        // also we synchronize on both streams which is a potential deadlock
+        // TODO(buck_team): move acknowledgement packet out of NGInputStream
+        synchronized (out) {
+            out.writeInt(0);
+            out.writeByte(NGConstants.CHUNKTYPE_SENDINPUT);
         }
         out.flush();
-        started = true;
     }
 
-	/**
-	 * @return true if interval since last read is less than heartbeat timeout interval.
-	 */
-	public synchronized boolean isClientConnected() {
-	    long intervalMillis = System.currentTimeMillis() - lastReadTime;
-	    return intervalMillis < heartbeatTimeoutMillis;
-	}
+    /**
+     * @return true if interval since last read is less than heartbeat timeout interval.
+     */
+    public synchronized boolean isClientConnected() {
+        return clientConnected;
+    }
 
     /**
      * Registers a new NGClientListener to be called on client disconnection or calls the listeners
      * clientDisconnected method if the client has already disconnected to avoid races.
+     *
      * @param listener the {@link NGClientListener} to be notified of client events.
-     * @throws InterruptedException if thrown by the clientDisconnected method or it calls System.exit().
      */
-    public synchronized void addClientListener(NGClientListener listener) {
-        if (! readFuture.isDone()) {
-            clientListeners.add(listener);
-        } else {
-            try {
-                notifyClientListener(listener);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+    public void addClientListener(NGClientListener listener) {
+        boolean shouldNotifyNow = false;
+
+        synchronized (this) {
+            if (clientConnected) {
+                clientListeners.add(listener);
+            } else {
+                shouldNotifyNow = true;
             }
+        }
+
+        if (shouldNotifyNow) {
+            listener.clientDisconnected();
         }
     }
 
@@ -375,12 +444,17 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     }
 
     /**
+     * Do not notify anymore about client disconnects
+     */
+    public synchronized void removeAllClientListeners() {
+        clientListeners.clear();
+    }
+
+    /**
      * @param listener the {@link NGHeartbeatListener} to be notified of client events.
      */
     public synchronized void addHeartbeatListener(NGHeartbeatListener listener) {
-        if (! readFuture.isDone()) {
-            heartbeatListeners.add(listener);
-        }
+        heartbeatListeners.add(listener);
     }
 
     /**

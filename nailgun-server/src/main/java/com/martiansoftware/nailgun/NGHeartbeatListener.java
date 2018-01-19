@@ -7,5 +7,5 @@ public interface NGHeartbeatListener {
      * This can normally be implemented as a no-op handler and is primarily useful for debugging.
      * {@link NGClientListener}s can be registered using {@link NGContext.registerHeartbeatListener}.
      */
-    public void heartbeatReceived(long intervalMillis);
+    void heartbeatReceived();
 }
