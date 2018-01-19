@@ -333,8 +333,10 @@ public class NGInputStream extends FilterInputStream implements Closeable {
     }
 
     private synchronized void sendSendInput() throws IOException {
-        out.writeInt(0);
-        out.writeByte(NGConstants.CHUNKTYPE_SENDINPUT);
+        synchronized(out) {
+          out.writeInt(0);
+          out.writeByte(NGConstants.CHUNKTYPE_SENDINPUT);
+        }
         out.flush();
         started = true;
     }
