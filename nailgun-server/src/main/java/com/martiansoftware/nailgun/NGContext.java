@@ -287,6 +287,13 @@ public class NGContext {
         getInputStream().removeClientListener(listener);
     }
 
+	/**
+	 * Do not notify about client exit
+	 */
+	public void removeAllClientListeners() {
+		getInputStream().removeAllClientListeners();
+	}
+
     /**
      * @param listener the {@link com.martiansoftware.nailgun.NGHeartbeatListener} to be notified of client events.
      */

@@ -17,15 +17,12 @@
 */
 
 package com.martiansoftware.nailgun.examples;
-import com.martiansoftware.nailgun.NGClientListener;
 import com.martiansoftware.nailgun.NGContext;
-import com.martiansoftware.nailgun.NGHeartbeatListener;
 
 import java.io.IOException;
-import java.io.PrintStream;
 
 /**
- * Print one  hash per second to standard out while the client is running.
+ * Print one hash per second to standard out while the client is running.
  * 
  * @author <a href="http://jimpurbrick.com">Jim Purbrick</a>
  */
@@ -42,21 +39,14 @@ public class Heartbeat {
         try {
             // Register a new NGClientListener. As clientDisconnected is called from
             // another thread any nail state access must be properly synchronized.
-            context.addClientListener(new NGClientListener() {
-                public void clientDisconnected() throws InterruptedException {
-                    throw new InterruptedException("Client Disconnected"); // Will interrupt the thread below.
-                }
-            });
+            Thread mainThread = Thread.currentThread();
+            context.addClientListener(mainThread::interrupt);
 
             // Register a new NGHeartbeatListener. This is normally only used for debugging disconnection problems.
-            context.addHeartbeatListener(new NGHeartbeatListener() {
-            public void heartbeatReceived(long intervalMillis) {
-                context.out.print("H");
-            }
-        });
+            context.addHeartbeatListener(() -> context.out.print("H"));
 
             // Loop printing a hash to the client every second until client disconnects.
-            while(! Thread.currentThread().isInterrupted()) {
+            while(!Thread.currentThread().isInterrupted()) {
                 Thread.sleep(5000);
                 context.out.print("S");
             }
