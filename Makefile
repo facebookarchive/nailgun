@@ -7,14 +7,12 @@
 # Your compiler location may vary.
 WIN32_CC=/usr/bin/i586-mingw32msvc-gcc
 
-CC=gcc
-CFLAGS=-Wall -pedantic -s -O3
 SRCDIR=nailgun-client
 PREFIX=/usr/local
 
 ng: ${SRCDIR}/ng.c
 	@echo "Building ng client.  To build a Windows binary, type 'make ng.exe'"
-	${CC} ${CFLAGS} -o ng ${SRCDIR}/ng.c
+	${CC} $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o ng ${SRCDIR}/ng.c
 
 install: ng
 	install -d ${PREFIX}/bin
