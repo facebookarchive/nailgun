@@ -17,6 +17,7 @@
  */
 package com.martiansoftware.nailgun;
 
+import java.io.InputStream;
 import java.util.Properties;
 
 /**
@@ -122,10 +123,13 @@ public class NGConstants {
      */
     static {
         Properties props = new Properties();
+        InputStream is = NGConstants.class.getResourceAsStream("/META-INF/maven/com.martiansoftware/nailgun-server/pom.properties");
         try {
-            props.load(NGConstants.class.getResourceAsStream("/META-INF/maven/com.martiansoftware/nailgun-server/pom.properties"));
+            props.load(is);
         } catch (Exception e) {
             System.err.println("Unable to load nailgun-version.properties.");
+        } finally {
+            Utils.closeQuietly(is);
         }
         VERSION  = props.getProperty("version", "[UNKNOWN]");
     }
