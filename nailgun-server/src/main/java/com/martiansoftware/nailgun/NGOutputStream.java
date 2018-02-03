@@ -19,99 +19,54 @@
 package com.martiansoftware.nailgun;
 
 import java.io.IOException;
+import java.io.OutputStream;
 
 /**
- * Wraps an OutputStream to send writes in NailGun chunks.  Because
- * multiple NGOutputStreams wrap the same OutputStream (that is, 
- * the OutputStream obtained from the Socket connection with
- * the client), writes are synchronized on the underlying OutputStream.
- * If this were not the case, write interleaving could completely
- * break the NailGun protocol.
- * 
- * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
+ * Thin layer over NailGun communicator to provide output stream to clients for writing
+ * stdout/stderr. This stream is NOT thread-safe, use PrintStream or similar decorator to make it
+ * such
  */
-class NGOutputStream extends java.io.DataOutputStream {
+class NGOutputStream extends OutputStream {
 
-	private final Object lock;
-    private byte streamCode;
-	private boolean closed = false;
+    private final byte streamCode;
+    private final NGCommunicator communicator;
+    byte[] buf = new byte[1];
 
-	/**
-	 * Creates a new NGOutputStream wrapping the specified
-	 * OutputStream and using the specified Nailgun chunk code.
-	 * @param out the OutputStream to wrap
-	 * @param streamCode the NailGun chunk code associated with this
-	 * stream (i.e., '1' for stdout, '2' for stderr).
-	 */
-	public NGOutputStream(java.io.OutputStream out, byte streamCode) {
-		super(out);
-        this.lock = out;
+    /**
+     * Creates a new NGOutputStream over {@link NGCommunicator} using the specified NailGun chunk
+     * code.
+     *
+     * @param communicator Lower level communicator which handles all writes to the socket
+     * @param streamCode the NailGun chunk code associated with this stream (i.e., '1' for stdout,
+     * '2' for stderr).
+     */
+    public NGOutputStream(NGCommunicator communicator, byte streamCode) {
         this.streamCode = streamCode;
-	}
-	
-	/**
-	 * @see java.io.OutputStream#write(byte[])
-	 */
-	public void write(byte[] b) throws IOException {
-		throwIfClosed();
-		write(b, 0, b.length);
-	}
-	
-	/**
-	 * @see java.io.OutputStream#write(int)
-	 */
-	public void write(int b) throws IOException {
-		throwIfClosed();
-		byte[] b2 = {(byte) b};
-		write(b2, 0, 1);
-	}
-	
-	/**
-	 * @see java.io.OutputStream#write(byte[],int,int)
-	 */
-	public void write(byte[] b, int offset, int len) throws IOException {
-		throwIfClosed();
-		synchronized(lock) {
-            writeInt(len);
-            writeByte(streamCode);
-			out.write(b, offset, len);
-		}
-		flush();
-	}
+        this.communicator = communicator;
+    }
 
-	/**
-	 * @see java.io.OutputStream#close()
-	 *
-	 * Implement an empty close function, to allow the client to close
-	 * the stdout and/or stderr, without this closing the connection
-	 * socket to the client.
-	 */
-	public void close() throws IOException {
-		throwIfClosed();
-		closed = true;
-		// Since we override DataOutputStream.close() but don't
-		// call super.close(), make sure to at least flush the stream
-		// so the last chunk written makes it to the client.
-		super.flush();
-	}
+    /**
+     * @see java.io.OutputStream#write(byte[])
+     */
+    @Override
+    public void write(byte[] b) throws IOException {
+        write(b, 0, b.length);
+    }
 
-	/**
-	 * @see java.io.OutputStream#flush()
-	 */
-	public void flush() throws IOException {
-		throwIfClosed();
-		super.flush();
-	}
+    /**
+     * @see java.io.OutputStream#write(int)
+     */
+    @Override
+    public void write(int b) throws IOException {
+        buf[0] = (byte) b;
+        write(buf, 0, 1);
+    }
 
-	/**
-	 * Check if stream is closed and throw an IOException if yes.
-	 *
-	 * In the case of a public operation is being performed while the stream
-	 * is already closed throws an IOException.
-	 */
-	private void throwIfClosed() throws IOException {
-		if(closed) {
-			throw new IOException();
-		}
-	}
+    /**
+     * @see java.io.OutputStream#write(byte[], int, int)
+     */
+    @Override
+    public void write(byte[] b, int offset, int len) throws IOException {
+        communicator.send(streamCode, b, offset, len);
+    }
 }

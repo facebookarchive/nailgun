@@ -79,8 +79,10 @@ class TestNailgunConnection(unittest.TestCase):
             stdout=subprocess.PIPE
 
         cmd = ['java', '-Djna.nosys=true', '-classpath', self.getClassPath()]
-        if os.environ.get('DEBUG_MODE') == '1':
-            cmd.append('-agentlib:jdwp=transport=dt_socket,address=localhost:8888,server=y,suspend=y')
+        debug_mode = os.environ.get('DEBUG_MODE') or ''
+        if debug_mode != '':
+            suspend = 'n' if debug_mode == '2' else 'y'
+            cmd.append('-agentlib:jdwp=transport=dt_socket,address=localhost:8888,server=y,suspend=' + suspend)
         cmd = cmd + ['com.martiansoftware.nailgun.NGServer', self.transport_address]
 
         self.ng_server_process = subprocess.Popen(

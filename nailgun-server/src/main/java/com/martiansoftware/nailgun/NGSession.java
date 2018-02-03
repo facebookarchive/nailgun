@@ -17,6 +17,7 @@
  */
 package com.martiansoftware.nailgun;
 
+import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -33,9 +34,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Reads the NailGun stream from the client through the command, then hands off
- * processing to the appropriate class. The NGSession obtains its sockets from
- * an NGSessionPool, which created this NGSession.
+ * Reads the NailGun stream from the client through the command, then hands off processing to the
+ * appropriate class. The NGSession obtains its sockets from an NGSessionPool, which created this
+ * NGSession.
  *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
@@ -56,18 +57,16 @@ public class NGSession extends Thread {
      */
     private final Object lock = new Object();
     /**
-     * The next socket this NGSession has been tasked with processing (by
-     * NGServer)
+     * The next socket this NGSession has been tasked with processing (by NGServer)
      */
     private Socket nextSocket = null;
     /**
-     * True if the server has been shutdown and this NGSession should terminate
-     * completely
+     * True if the server has been shutdown and this NGSession should terminate completely
      */
     private boolean done = false;
     /**
-     * The instance number of this NGSession. That is, if this is the Nth
-     * NGSession to be created, then this is the value for N.
+     * The instance number of this NGSession. That is, if this is the Nth NGSession to be created,
+     * then this is the value for N.
      */
     private final long instanceNumber;
 
@@ -84,13 +83,13 @@ public class NGSession extends Thread {
      * signature of main(String[]) for reflection operations
      */
     private final static Class[] mainSignature = {
-            String[].class,
+        String[].class,
     };
     /**
      * signature of nailMain(NGContext) for reflection operations
      */
     private final static Class[] nailMainSignature = {
-            NGContext.class,
+        NGContext.class,
     };
 
     /**
@@ -104,12 +103,11 @@ public class NGSession extends Thread {
         } catch (SecurityException e) {
             throw e;
         }
-        
+
     }
 
     /**
-     * Creates a new NGSession running for the specified NGSessionPool and
-     * NGServer.
+     * Creates a new NGSession running for the specified NGSessionPool and NGServer.
      *
      * @param sessionPool The NGSessionPool we're working for
      * @param server The NGServer we're working for
@@ -134,8 +132,8 @@ public class NGSession extends Thread {
     }
 
     /**
-     * Instructs this NGSession to process the specified socket, after which
-     * this NGSession will return itself to the pool from which it came.
+     * Instructs this NGSession to process the specified socket, after which this NGSession will
+     * return itself to the pool from which it came.
      *
      * @param socket the socket (connected to a client) to process
      */
@@ -148,11 +146,10 @@ public class NGSession extends Thread {
     }
 
     /**
-     * Returns the next socket to process. This will block the NGSession thread
-     * until there's a socket to process or the NGSession has been shut down.
+     * Returns the next socket to process. This will block the NGSession thread until there's a
+     * socket to process or the NGSession has been shut down.
      *
-     * @return the next socket to process, or
-     * <code>null</code> if the NGSession has been shut down.
+     * @return the next socket to process, or <code>null</code> if the NGSession has been shut down.
      */
     private Socket nextSocket() {
         Socket result;
@@ -187,8 +184,8 @@ public class NGSession extends Thread {
     }
 
     /**
-     * The main NGSession loop. This gets the next socket to process, runs the
-     * nail for the socket, and loops until shut down.
+     * The main NGSession loop. This gets the next socket to process, runs the nail for the socket,
+     * and loops until shut down.
      */
     public void run() {
 
@@ -198,23 +195,22 @@ public class NGSession extends Thread {
         Socket socket = nextSocket();
         while (socket != null) {
             LOG.log(Level.FINE, "Client connected");
-            try {
-                DataInputStream sockin = new DataInputStream(socket.getInputStream());
-                DataOutputStream sockout = new DataOutputStream(socket.getOutputStream());
+            try (DataInputStream sockin = new DataInputStream(socket.getInputStream());
+                DataOutputStream sockout = new DataOutputStream(socket.getOutputStream())) {
 
                 // client info - command line arguments and environment
                 List remoteArgs = new java.util.ArrayList();
                 Properties remoteEnv = new Properties();
 
-                String cwd = null;			// working directory
-                String command = null;		// alias or class name
+                String cwd = null;            // working directory
+                String command = null;        // alias or class name
 
                 // read everything from the client up to and including the command
                 while (command == null) {
                     int bytesToRead = sockin.readInt();
                     byte chunkType = sockin.readByte();
 
-                    byte[] b = new byte[(int) bytesToRead];
+                    byte[] b = new byte[bytesToRead];
                     sockin.readFully(b);
                     String line = new String(b, "UTF-8");
 
@@ -230,10 +226,9 @@ public class NGSession extends Thread {
                             int equalsIndex = line.indexOf('=');
                             if (equalsIndex > 0) {
                                 remoteEnv.setProperty(
-                                        line.substring(0, equalsIndex),
-                                        line.substring(equalsIndex + 1));
+                                    line.substring(0, equalsIndex),
+                                    line.substring(equalsIndex + 1));
                             }
-                            String key = line.substring(0, equalsIndex);
                             break;
 
                         case NGConstants.CHUNKTYPE_COMMAND:
@@ -246,7 +241,7 @@ public class NGSession extends Thread {
                             cwd = line;
                             break;
 
-                        default:	// freakout?
+                        default:    // freakout?
                     }
                 }
 
@@ -258,14 +253,19 @@ public class NGSession extends Thread {
                 }
                 updateThreadName(threadName);
 
-                // can't create NGInputStream until we've received a command, because at
+                // can't create NGCommunicator until we've received a command, because at
                 // that point the stream from the client will only include stdin and stdin-eof
                 // chunks
                 try (
-                    InputStream in = new NGInputStream(sockin, sockout, heartbeatTimeoutMillis);
-                    PrintStream out = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDOUT));
-                    PrintStream err = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDERR));
-                    PrintStream exit = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_EXIT));
+                    NGCommunicator comm = new NGCommunicator(sockin, sockout,
+                        heartbeatTimeoutMillis);
+                    InputStream in = new NGInputStream(comm);
+                    PrintStream out = new PrintStream(
+                        new NGOutputStream(comm, NGConstants.CHUNKTYPE_STDOUT));
+                    PrintStream err = new PrintStream(
+                        new NGOutputStream(comm, NGConstants.CHUNKTYPE_STDERR));
+                    PrintStream exit = new PrintStream(
+                        new NGOutputStream(comm, NGConstants.CHUNKTYPE_EXIT));
                 ) {
                     // ThreadLocal streams for System.in/out/err redirection
                     ((ThreadLocalInputStream) System.in).init(in);
@@ -285,21 +285,24 @@ public class NGSession extends Thread {
 
                         Object[] methodArgs = new Object[1];
                         Method mainMethod = null; // will be either main(String[]) or nailMain(NGContext)
-                        String[] cmdlineArgs = (String[]) remoteArgs.toArray(new String[remoteArgs.size()]);
+                        String[] cmdlineArgs = (String[]) remoteArgs
+                            .toArray(new String[remoteArgs.size()]);
 
                         boolean isStaticNail = true; // See: NonStaticNail.java
 
                         Class[] interfaces = cmdclass.getInterfaces();
 
-                        for (int i = 0; i < interfaces.length; i++){
-                            if (interfaces[i].equals(NonStaticNail.class)){
-                                isStaticNail = false; break;
+                        for (int i = 0; i < interfaces.length; i++) {
+                            if (interfaces[i].equals(NonStaticNail.class)) {
+                                isStaticNail = false;
+                                break;
                             }
                         }
 
-                        if (!isStaticNail){
+                        if (!isStaticNail) {
 
-                            mainMethod = cmdclass.getMethod("nailMain", new Class[]{ String[].class });
+                            mainMethod = cmdclass
+                                .getMethod("nailMain", new Class[]{String[].class});
                             methodArgs[0] = cmdlineArgs;
 
                         } else {
@@ -314,6 +317,7 @@ public class NGSession extends Thread {
                                 context.setCommand(command);
                                 context.setExitStream(exit);
                                 context.setNGServer(server);
+                                context.setCommunicator(comm);
                                 context.setEnv(remoteEnv);
                                 context.setInetAddress(socket.getInetAddress());
                                 context.setPort(socket.getPort());
@@ -335,16 +339,16 @@ public class NGSession extends Thread {
                             NGSecurityManager.setExit(exit);
 
                             try {
-                                if (isStaticNail){
+                                if (isStaticNail) {
                                     mainMethod.invoke(null, methodArgs);
                                 } else {
                                     mainMethod.invoke(cmdclass.newInstance(), methodArgs);
                                 }
                             } catch (InvocationTargetException ite) {
                                 throw (ite.getCause());
-                            } catch (InstantiationException e){
+                            } catch (InstantiationException e) {
                                 throw (e);
-                            } catch (IllegalAccessException e){
+                            } catch (IllegalAccessException e) {
                                 throw (e);
                             } catch (Throwable t) {
                                 throw (t);
@@ -355,29 +359,18 @@ public class NGSession extends Thread {
                         }
 
                     } catch (NGExitException exitEx) {
-                        LOG.log(Level.INFO, "Server cleanly exited with status " + exitEx.getStatus(), exitEx);
+                        LOG.log(Level.INFO, "Server cleanly exited with status {0}",
+                            exitEx.getStatus());
                         exit.println(exitEx.getStatus());
-                        server.out.println(Thread.currentThread().getName() + " exited with status " + exitEx.getStatus());
+                        server.out.println(
+                            Thread.currentThread().getName() + " exited with status " + exitEx
+                                .getStatus());
                     } catch (Throwable t) {
-                        LOG.log(Level.INFO, "Server unexpectedly exited with unhandled exception", t);
+                        LOG.log(Level.INFO, "Server unexpectedly exited with unhandled exception",
+                            t);
                         t.printStackTrace();
                         exit.println(NGConstants.EXIT_EXCEPTION); // remote exception constant
                     }
-                } finally {
-                    LOG.log(Level.FINE, "Flushing client socket");
-                    sockout.flush();
-                    try {
-                        socket.shutdownInput();
-                        socket.shutdownOutput();
-                    } catch (IOException e) {
-                        LOG.log(
-                            Level.FINE,
-                            "Error shutting down socket I/O (this is expected if the client disconnected already)",
-                            e);
-                    }
-                    LOG.log(Level.FINE, "Closing client socket");
-                    socket.close();
-                    LOG.log(Level.FINE, "Finished tearing down client socket");
                 }
 
             } catch (Throwable t) {
@@ -391,6 +384,14 @@ public class NGSession extends Thread {
 
             updateThreadName(null);
             sessionPool.give(this);
+
+            LOG.log(Level.FINE, "Closing client socket");
+            try {
+                socket.close();
+            } catch (Throwable t) {
+                LOG.log(Level.WARNING, "Internal error closing socket", t);
+            }
+
             LOG.log(Level.FINE, "Waiting for next client to connect");
             socket = nextSocket();
         }
