@@ -3,4 +3,6 @@ jdk:
   - oraclejdk8
 
 script:
+  - make ng
+  - make ng.exe
   - scripts/travis_run.sh
