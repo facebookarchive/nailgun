@@ -17,6 +17,7 @@
  */
 package com.martiansoftware.nailgun;
 
+import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -262,10 +263,10 @@ public class NGSession extends Thread {
                 // that point the stream from the client will only include stdin and stdin-eof
                 // chunks
                 try (
-                    InputStream in = new NGInputStream(sockin, sockout, heartbeatTimeoutMillis);
-                    PrintStream out = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDOUT));
-                    PrintStream err = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_STDERR));
-                    PrintStream exit = new PrintStream(new NGOutputStream(sockout, NGConstants.CHUNKTYPE_EXIT));
+                    InputStream in = new NGInputStream(sockin, new DataOutputStream(new BufferedOutputStream(sockout)), heartbeatTimeoutMillis);
+                    PrintStream out = new PrintStream(new NGOutputStream(new BufferedOutputStream(sockout), NGConstants.CHUNKTYPE_STDOUT));
+                    PrintStream err = new PrintStream(new NGOutputStream(new BufferedOutputStream(sockout), NGConstants.CHUNKTYPE_STDERR));
+                    PrintStream exit = new PrintStream(new NGOutputStream(new BufferedOutputStream(sockout), NGConstants.CHUNKTYPE_EXIT));
                 ) {
                     // ThreadLocal streams for System.in/out/err redirection
                     ((ThreadLocalInputStream) System.in).init(in);
