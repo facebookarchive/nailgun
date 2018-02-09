@@ -110,6 +110,7 @@ public class NGCommunicator implements Closeable {
         long futureTimeout = heartbeatTimeoutMillis + heartbeatTimeoutMillis / 10;
 
         orchestratorExecutor.submit(() -> {
+            NGClientDisconnectReason reason = NGClientDisconnectReason.INTERNAL_ERROR;
             try {
                 LOG.log(Level.FINE, "Orchestrator thread started");
                 while (true) {
@@ -141,6 +142,7 @@ public class NGCommunicator implements Closeable {
                     // DataInputStream throws EOFException if stream is terminated
                     // just do nothing and exit main orchestrator thread loop
                 } else if (cause instanceof SocketTimeoutException) {
+                    reason = NGClientDisconnectReason.SOCKET_TIMEOUT;
                     LOG.log(Level.WARNING,
                         "Nailgun client socket timed out after " + heartbeatTimeoutMillis
                             + " ms",
@@ -150,6 +152,7 @@ public class NGCommunicator implements Closeable {
                         cause);
                 }
             } catch (TimeoutException e) {
+                reason = NGClientDisconnectReason.HEARTBEAT;
                 LOG.log(Level.WARNING,
                     "Nailgun client read future timed out after " + futureTimeout + " ms",
                     e);
@@ -170,23 +173,19 @@ public class NGCommunicator implements Closeable {
             // keep orchestrator thread running until signalled to shut up from close()
             // it is still responsible to notify about client disconnects if listener is
             // attached after disconnect had really happened
-            waitTerminationAndNotifyClients();
+            waitTerminationAndNotifyClients(reason);
 
             LOG.log(Level.FINE, "Orchestrator thread finished");
         });
     }
 
-    private void waitTerminationAndNotifyClients() {
+    private void waitTerminationAndNotifyClients(NGClientDisconnectReason reason) {
         while(true) {
             List<NGClientListener> listeners = new ArrayList<>();
             synchronized (orchestratorEvent) {
-                // if shutdown is signalled from close, do not notify client listeners
-                // this can only happen when NGSession has finished processing a nail and
-                // closing
-                if (shutdown) {
-                    return;
+                if (shutdown){
+                    reason = NGClientDisconnectReason.SESSION_SHUTDOWN;
                 }
-
                 if (!clientListeners.isEmpty()) {
                     listeners.addAll(clientListeners);
                     clientListeners.clear();
@@ -195,12 +194,15 @@ public class NGCommunicator implements Closeable {
 
             // release the lock and notify clients about disconnect
             for (NGClientListener listener : listeners) {
-                listener.clientDisconnected();
+                listener.clientDisconnected(reason);
             }
 
             synchronized (orchestratorEvent) {
-                if (shutdown || !clientListeners.isEmpty()) {
+                if (!clientListeners.isEmpty()) {
                     continue;
+                }
+                if (shutdown) {
+                    return;
                 }
                 try {
                     // wait for any new other client listener to register, or shutdown

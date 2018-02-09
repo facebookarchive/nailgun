@@ -34,6 +34,10 @@ if os.name == 'nt':
 
 
 class TestNailgunConnection(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        super(TestNailgunConnection, self).__init__(*args, **kwargs)
+        self.heartbeat_timeout_ms = 10000
+
     def setUp(self):
         self.setUpTransport()
         self.startNailgun()
@@ -78,12 +82,22 @@ class TestNailgunConnection(unittest.TestCase):
         if os.name == 'posix':
             stdout=subprocess.PIPE
 
-        cmd = ['java', '-Djna.nosys=true', '-classpath', self.getClassPath()]
+        log_config_file = os.path.join(self.tmpdir, 'logging.properties')
+        self.log_file = os.path.join(self.tmpdir, 'test_ng.log')
+        with open(log_config_file, 'w') as config_file:
+            config_file.write('handlers = java.util.logging.FileHandler\n')
+            config_file.write('.level = ALL\n')
+            config_file.write('java.util.logging.FileHandler.level = ALL\n')
+            config_file.write('java.util.logging.FileHandler.pattern = ' + self.log_file + '\n')
+            config_file.write('java.util.logging.FileHandler.count = 1\n')
+            config_file.write('java.util.logging.FileHandler.formatter = java.util.logging.SimpleFormatter\n')
+
+        cmd = ['java', '-Djna.nosys=true', '-Djava.util.logging.config.file=' + log_config_file, '-classpath', self.getClassPath()]
         debug_mode = os.environ.get('DEBUG_MODE') or ''
         if debug_mode != '':
             suspend = 'n' if debug_mode == '2' else 'y'
             cmd.append('-agentlib:jdwp=transport=dt_socket,address=localhost:8888,server=y,suspend=' + suspend)
-        cmd = cmd + ['com.martiansoftware.nailgun.NGServer', self.transport_address]
+        cmd = cmd + ['com.martiansoftware.nailgun.NGServer', self.transport_address, str(self.heartbeat_timeout_ms)]
 
         self.ng_server_process = subprocess.Popen(
             cmd,
@@ -111,6 +125,46 @@ class TestNailgunConnection(unittest.TestCase):
                     break
 
         self.assertTrue(transport_exists(self.transport_file))
+
+    def tearDown(self):
+        try:
+            with NailgunConnection(
+                self.transport_address,
+                cwd=os.getcwd(),
+                stderr=None,
+                stdin=None,
+                stdout=None) as c:
+                c.send_command('ng-stop')
+        except NailgunException as e:
+            # stopping server is a best effort
+            # if something wrong has happened, we will kill it anyways
+            pass
+
+        # Python2 compatible wait with timeout
+        process_exit_code = None
+        for _ in range(0, 500):
+            process_exit_code = self.ng_server_process.poll()
+            if process_exit_code is not None:
+                break
+            time.sleep(0.02)   # 1 second total
+
+        if process_exit_code is None:
+            # some test has failed, ng-server was not stopped. killing it
+            self.ng_server_process.kill()
+
+        debug_logs = os.environ.get('DEBUG_LOGS') or ''
+        if debug_logs != '':
+            with open(self.log_file, 'r') as log_file:
+                print('NAILGUN SERVER LOG:\n')
+                print(log_file.read())
+
+        shutil.rmtree(self.tmpdir)
+
+
+class TestNailgunConnectionMain(TestNailgunConnection):
+
+    def __init__(self, *args, **kwargs):
+        super(TestNailgunConnectionMain, self).__init__(*args, **kwargs)
 
     def test_nailgun_stats(self):
         output = StringIO.StringIO()
@@ -156,36 +210,60 @@ class TestNailgunConnection(unittest.TestCase):
             exit_code = c.send_command('ng-stats')
         self.assertEqual(exit_code, 0)
 
-    def tearDown(self):
-        try:
-            with NailgunConnection(
+    def test_nailgun_heartbeats(self):
+        output = StringIO.StringIO()
+        with NailgunConnection(
                 self.transport_address,
-                cwd=os.getcwd(),
                 stderr=None,
                 stdin=None,
-                stdout=None) as c:
-                c.send_command('ng-stop')
-        except NailgunException as e:
-            # stopping server is a best effort
-            # if something wrong has happened, we will kill it anyways
-            pass
+                stdout=output,
+                heartbeat_interval_sec=0.1) as c:
+            # just run Heartbeat nail for 5 seconds. During this period there should be
+            # heartbeats received and printed back
+            exit_code = c.send_command('com.martiansoftware.nailgun.examples.Heartbeat', ['5000'])
+        self.assertTrue(output.getvalue().count('H') > 10)
 
-        # Python2 compatible wait with timeout
-        process_exit_code = None
-        for _ in range(0, 500):
-            process_exit_code = self.ng_server_process.poll()
-            if process_exit_code is not None:
-                break
-            time.sleep(0.02)   # 1 second total
+    def test_nailgun_no_heartbeat(self):
+        output = StringIO.StringIO()
+        with NailgunConnection(
+                self.transport_address,
+                stderr=None,
+                stdin=None,
+                stdout=output,
+                heartbeat_interval_sec=0) as c:
+            exit_code = c.send_command('com.martiansoftware.nailgun.examples.Heartbeat', ['3000'])
+        self.assertTrue(output.getvalue().count('H') == 0)
 
-        if process_exit_code is None:
-            # some test has failed, ng-server was not stopped. killing it
-            self.ng_server_process.kill()
-        shutil.rmtree(self.tmpdir)
+
+class TestNailgunConnectionSmallHeartbeatTimeout(TestNailgunConnection):
+
+    def __init__(self, *args, **kwargs):
+        super(TestNailgunConnectionSmallHeartbeatTimeout, self).__init__(*args, **kwargs)
+
+    def setUp(self):
+        self.heartbeat_timeout_ms = 1000
+        super(TestNailgunConnectionSmallHeartbeatTimeout, self).setUp()
+
+    def test_nailgun_disconnect(self):
+        """
+        We should disconnect before time elapses because of configuration:
+        Heartbeats are sent every 5 secs
+        Server expects to look for disconnects if no hearbeat is received in 1 sec
+        Server runs for 30 sec given we still have heartbeats, so it should output about 6 'H'
+        We assert that number of 'H' is smaller
+        """
+        output = StringIO.StringIO()
+        with NailgunConnection(
+                self.transport_address,
+                stderr=None,
+                stdin=None,
+                stdout=output,
+                heartbeat_interval_sec=5) as c:
+            exit_code = c.send_command('com.martiansoftware.nailgun.examples.Heartbeat', ['30000'])
+        self.assertTrue(output.getvalue().count('H') < 3)
 
 
 if __name__ == '__main__':
-    for i in range(10):
-        was_successful = unittest.main(exit=False).result.wasSuccessful()
-        if not was_successful:
-            sys.exit(1)
+    was_successful = unittest.main(exit=False).result.wasSuccessful()
+    if not was_successful:
+        sys.exit(1)
