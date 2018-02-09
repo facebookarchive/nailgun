@@ -172,6 +172,8 @@ public class NGSession extends Thread {
             // read() calls throw SocketTimeoutException which unblocks read(). The exception must
             // be properly handled by calling code.
             try {
+                // TODO(buck_team): this does not work with current NGUnixDomainSocket
+                // implementation
                 result.setSoTimeout(this.heartbeatTimeoutMillis);
             } catch (SocketException e) {
                 // this exception might be thrown if socket is already closed

@@ -17,42 +17,51 @@
 */
 
 package com.martiansoftware.nailgun.examples;
-import com.martiansoftware.nailgun.NGContext;
 
-import java.io.IOException;
+import com.martiansoftware.nailgun.NGContext;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Print one hash per second to standard out while the client is running.
- * 
- * @author <a href="http://jimpurbrick.com">Jim Purbrick</a>
+ * Print one hash per second to standard out while the client is running. Whenever heartbeat is
+ * received from client, print H.
  */
 public class Heartbeat {
 
-    /**
-     * Registers a {@link com.martiansoftware.nailgun.NGClientListener} with the session then
-     * loops forever printing hashes until
-     * {@link com.martiansoftware.nailgun.NGClientListener#clientDisconnected()} is called.
-     * @param context the Nailgun context used to register the nail as a
-     * {@link com.martiansoftware.nailgun.NGClientListener}.
-     */
-	public static void nailMain(final NGContext context) throws IOException {
-        try {
-            // Register a new NGClientListener. As clientDisconnected is called from
-            // another thread any nail state access must be properly synchronized.
-            Thread mainThread = Thread.currentThread();
-            context.addClientListener(mainThread::interrupt);
+    public static void nailMain(final NGContext context) {
+        long start = System.nanoTime();
+        long run_nanos = Long.MAX_VALUE;
+        String[] args = context.getArgs();
+        if (args.length > 0) {
+            // first argument is the number of milliseconds to run a command
+            // if omitted it will never interrupt by itself
+            try {
+                run_nanos = Long.parseUnsignedLong(args[0]) * 1000 * 1000;
+            } catch (Exception e) {}
+        }
 
-            // Register a new NGHeartbeatListener. This is normally only used for debugging disconnection problems.
+        try {
+            Object lock = new Object();
+            AtomicBoolean shutdown = new AtomicBoolean(false);
+
+            context.addClientListener(reason -> {
+                synchronized (lock) {
+                    shutdown.set(true);
+                    lock.notifyAll();
+                }
+            });
+
             context.addHeartbeatListener(() -> context.out.print("H"));
 
-            // Loop printing a hash to the client every second until client disconnects.
-            while(!Thread.currentThread().isInterrupted()) {
-                Thread.sleep(5000);
-                context.out.print("S");
+            synchronized (lock) {
+                // print hashes every second when client is active
+                while (!shutdown.get() && (System.nanoTime() - start) < run_nanos) {
+                    context.out.print("S");
+                    lock.wait(1000);
+                }
             }
         } catch (InterruptedException ignored) {
             System.exit(42);
         }
         System.exit(0);
-	}
+    }
 }
