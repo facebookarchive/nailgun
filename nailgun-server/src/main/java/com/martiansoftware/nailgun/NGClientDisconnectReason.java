@@ -19,9 +19,13 @@ public enum NGClientDisconnectReason {
     /**
      * Some error encountered reading data from the socket
      */
-    INTERNAL_ERROR,
+    SOCKET_ERROR,
     /**
      * Server is no longer reading from client because server itself signals shutdown
      */
     SESSION_SHUTDOWN,
+    /**
+     * Some unexpected error happened
+     */
+    INTERNAL_ERROR,
 }

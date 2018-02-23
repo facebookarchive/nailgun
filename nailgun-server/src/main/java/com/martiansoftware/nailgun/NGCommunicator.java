@@ -141,6 +141,8 @@ public class NGCommunicator implements Closeable {
                 if (cause instanceof EOFException) {
                     // DataInputStream throws EOFException if stream is terminated
                     // just do nothing and exit main orchestrator thread loop
+                    LOG.log(Level.FINE, "Socket is disconnected");
+                    reason = NGClientDisconnectReason.SOCKET_ERROR;
                 } else if (cause instanceof SocketTimeoutException) {
                     reason = NGClientDisconnectReason.SOCKET_TIMEOUT;
                     LOG.log(Level.WARNING,
