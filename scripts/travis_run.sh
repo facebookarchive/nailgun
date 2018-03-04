@@ -3,4 +3,6 @@ set -eux
 
 mvn package
 
-python -m pynailgun.test_ng
+export PYTHONPATH=.
+python --version
+python pynailgun/test_ng.py

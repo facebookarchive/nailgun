@@ -1,6 +1,12 @@
-language: java
-jdk:
-  - oraclejdk8
+language: python
+addons:
+  apt:
+    packages:
+      - oracle-java8-set-default
+python:
+  - "2.7"
+  - "3.5"
+  - "3.6"
 
 script:
   - scripts/travis_run.sh
