@@ -14,17 +14,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 import ctypes
 import platform
 import optparse
 import os
 import os.path
-import Queue
 import select
 import socket
 import struct
 import sys
 from threading import Condition, Event, Thread, RLock
+
+is_py2 = sys.version[0] == '2'
+if is_py2:
+    import Queue as Queue
+    import __builtin__ as builtin
+    def to_bytes(s): return s
+else:
+    import queue as Queue
+    import builtins as builtin
+    def to_bytes(s): return bytes(s, "utf-8")
+    from io import UnsupportedOperation
 
 # @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
 # @author Pete Kirkham (Win32 port)
@@ -39,26 +50,25 @@ CHUNK_HEADER_LEN = 5
 THREAD_TERMINATION_TIMEOUT_SEC = 0.5
 STDIN_BUFFER_LINE_SIZE = 10
 
-CHUNKTYPE_STDIN = '0'
-CHUNKTYPE_STDOUT = '1'
-CHUNKTYPE_STDERR = '2'
-CHUNKTYPE_STDIN_EOF = '.'
-CHUNKTYPE_ARG = 'A'
-CHUNKTYPE_LONGARG = 'L'
-CHUNKTYPE_ENV = 'E'
-CHUNKTYPE_DIR = 'D'
-CHUNKTYPE_CMD = 'C'
-CHUNKTYPE_EXIT = 'X'
-CHUNKTYPE_SENDINPUT = 'S'
-CHUNKTYPE_HEARTBEAT = 'H'
+CHUNKTYPE_STDIN = b'0'
+CHUNKTYPE_STDOUT = b'1'
+CHUNKTYPE_STDERR = b'2'
+CHUNKTYPE_STDIN_EOF = b'.'
+CHUNKTYPE_ARG = b'A'
+CHUNKTYPE_LONGARG = b'L'
+CHUNKTYPE_ENV = b'E'
+CHUNKTYPE_DIR = b'D'
+CHUNKTYPE_CMD = b'C'
+CHUNKTYPE_EXIT = b'X'
+CHUNKTYPE_SENDINPUT = b'S'
+CHUNKTYPE_HEARTBEAT = b'H'
 
 NSEC_PER_SEC = 1000000000
 DEFAULT_HEARTBEAT_INTERVAL_SEC = 0.5
 SELECT_MAX_BLOCK_TIME_SEC = 1.0
 
 # We need to support Python 2.6 hosts which lack memoryview().
-import __builtin__
-HAS_MEMORYVIEW = 'memoryview' in dir(__builtin__)
+HAS_MEMORYVIEW = 'memoryview' in dir(builtin)
 
 EVENT_STDIN_CHUNK = 0
 EVENT_STDIN_CLOSED = 1
@@ -242,7 +252,7 @@ class WindowsNamedPipeTransport(Transport):
     """ connect to a named pipe """
 
     def __init__(self, sockpath):
-        self.sockpath = ur'\\.\pipe\{0}'.format(sockpath)
+        self.sockpath = u'\\\\.\\pipe\\{0}'.format(sockpath)
 
         while True:
             self.pipe = CreateFile(self.sockpath,
@@ -452,7 +462,7 @@ class NailgunConnection(object):
             self._send_tty_format(self.stdin)
             self._send_tty_format(self.stdout)
             self._send_tty_format(self.stderr)
-            for k, v in env.iteritems():
+            for k, v in env.items():
                 self._send_env_var(k, v)
             self._send_chunk(cwd, CHUNKTYPE_DIR)
             self._send_chunk(cmd, CHUNKTYPE_CMD)
@@ -523,9 +533,12 @@ class NailgunConnection(object):
         """
         if not f or not hasattr(f, 'fileno'):
             return
-        fileno = f.fileno()
-        isatty = os.isatty(fileno)
-        self._send_env_var('NAILGUN_TTY_' + str(fileno), str(int(isatty)))
+        try:
+            fileno = f.fileno()
+            isatty = os.isatty(fileno)
+            self._send_env_var('NAILGUN_TTY_' + str(fileno), str(int(isatty)))
+        except UnsupportedOperation:
+            return
 
 
     def _send_file_arg(self, filename):
@@ -553,7 +566,8 @@ class NailgunConnection(object):
                 self.buf,
                 bytes_to_read)
             if dest_file:
-                dest_file.write(self.buf[:bytes_received])
+                data = self.buf[:bytes_received].decode("utf-8")
+                dest_file.write(data)
             bytes_read += bytes_received
 
 
@@ -611,7 +625,7 @@ class NailgunConnection(object):
         """
         num_bytes = min(len(self.buf), exit_len)
         self._recv_to_buffer(num_bytes, self.buf)
-        self.exit_code = int(''.join(self.buf.raw[:num_bytes]))
+        self.exit_code = int(self.buf.raw[:num_bytes])
 
 
     def _send_heartbeat(self):
@@ -730,7 +744,7 @@ def send_thread_main(conn):
                 (chunk_type, buf) = conn.send_queue.get()
                 struct.pack_into('>ic', header_buf, 0, len(buf), chunk_type)
                 conn.transport.sendall(header_buf.raw)
-                conn.transport.sendall(buf)
+                conn.transport.sendall(to_bytes(buf))
 
             with conn.send_condition:
                 if conn.shutdown_event.is_set():
@@ -872,7 +886,7 @@ def main():
     (options, args) = parser.parse_args()
 
     if options.nailgun_showversion:
-        print 'NailGun client version ' + NAILGUN_VERSION
+        print('NailGun client version ' + NAILGUN_VERSION)
 
     if len(args):
         cmd = args.pop(0)
@@ -889,7 +903,7 @@ def main():
             exit_code = c.send_command(cmd, cmd_args, options.nailgun_filearg)
             sys.exit(exit_code)
     except NailgunException as e:
-        print >>sys.stderr, str(e)
+        sys.stderr.write(str(e))
         sys.exit(e.code)
     except KeyboardInterrupt as e:
         pass

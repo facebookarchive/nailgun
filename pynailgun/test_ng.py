@@ -1,7 +1,6 @@
 import subprocess
 import os
 import time
-import StringIO
 import unittest
 import tempfile
 import shutil
@@ -10,6 +9,11 @@ import sys
 
 from pynailgun import NailgunException, NailgunConnection
 
+is_py2 = sys.version[0] == '2'
+if is_py2:
+    from StringIO import StringIO
+else:
+    from io import StringIO
 
 if os.name == 'posix':
     def transport_exists(transport_file):
@@ -50,7 +54,7 @@ class TestNailgunConnection(unittest.TestCase):
         else:
             pipe_name = u'nailgun-test-{0}'.format(uuid.uuid4().hex)
             self.transport_address = u'local:{0}'.format(pipe_name)
-            self.transport_file = ur'\\.\pipe\{0}'.format(pipe_name)
+            self.transport_file = u'\\\\.\\pipe\{0}'.format(pipe_name)
 
     def getClassPath(self):
         cp = [
@@ -111,7 +115,7 @@ class TestNailgunConnection(unittest.TestCase):
         if os.name == 'posix':
             # on *nix we have to wait for server to be ready to accept connections
             while True:
-                the_first_line = self.ng_server_process.stdout.readline().strip()
+                the_first_line = str(self.ng_server_process.stdout.readline().strip())
                 if "NGServer" in the_first_line and "started" in the_first_line:
                     break
                 if the_first_line is None or the_first_line == '':
@@ -167,7 +171,7 @@ class TestNailgunConnectionMain(TestNailgunConnection):
         super(TestNailgunConnectionMain, self).__init__(*args, **kwargs)
 
     def test_nailgun_stats(self):
-        output = StringIO.StringIO()
+        output = StringIO()
         with NailgunConnection(
                 self.transport_address,
                 stderr=None,
@@ -180,7 +184,7 @@ class TestNailgunConnectionMain(TestNailgunConnection):
         self.assertEqual(actual_out, expected_out)
 
     def test_nailgun_exit_code(self):
-        output = StringIO.StringIO()
+        output = StringIO()
         expected_exit_code = 10
         with NailgunConnection(
                 self.transport_address,
@@ -193,8 +197,8 @@ class TestNailgunConnectionMain(TestNailgunConnection):
     def test_nailgun_stdin(self):
         lines = [str(i) for i in range(100)]
         echo = '\n'.join(lines)
-        output = StringIO.StringIO()
-        input = StringIO.StringIO(echo)
+        output = StringIO()
+        input = StringIO(echo)
         with NailgunConnection(
                 self.transport_address,
                 stderr=None,
@@ -211,7 +215,7 @@ class TestNailgunConnectionMain(TestNailgunConnection):
         self.assertEqual(exit_code, 0)
 
     def test_nailgun_heartbeats(self):
-        output = StringIO.StringIO()
+        output = StringIO()
         with NailgunConnection(
                 self.transport_address,
                 stderr=None,
@@ -224,7 +228,7 @@ class TestNailgunConnectionMain(TestNailgunConnection):
         self.assertTrue(output.getvalue().count('H') > 10)
 
     def test_nailgun_no_heartbeat(self):
-        output = StringIO.StringIO()
+        output = StringIO()
         with NailgunConnection(
                 self.transport_address,
                 stderr=None,
@@ -252,7 +256,7 @@ class TestNailgunConnectionSmallHeartbeatTimeout(TestNailgunConnection):
         Server runs for 30 sec given we still have heartbeats, so it should output about 6 'H'
         We assert that number of 'H' is smaller
         """
-        output = StringIO.StringIO()
+        output = StringIO()
         with NailgunConnection(
                 self.transport_address,
                 stderr=None,
