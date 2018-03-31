@@ -26,7 +26,7 @@ package com.martiansoftware.nailgun;
 
 public class NailStats implements Cloneable {
 
-	private final Class nailclass;
+	private final String nailclass;
 	private long runCounter;
 	private long refCounter;
 	private final Object lock;
@@ -35,7 +35,7 @@ public class NailStats implements Cloneable {
 	 * Creates a new NailStats object for the specified class
 	 * @param nailclass the class for which we'll collect statistics
 	 */
-	NailStats(Class nailclass) {
+	NailStats(String nailclass) {
 		this.nailclass = nailclass;
 		runCounter = 0;
 		refCounter = 0;
@@ -87,8 +87,8 @@ public class NailStats implements Cloneable {
 	 * Returns the class for which we're tracking statistics
 	 * @return the class for which we're tracking statistics
 	 */
-	public Class getNailClass() {
-		return (nailclass);
+	public String getNailClass() {
+		return nailclass;
 	}
 	
 	/**
@@ -129,6 +129,6 @@ public class NailStats implements Cloneable {
 	 * object. 
 	 */
 	public String toString() {
-		return (nailclass.getName() + ": " + getRunCount() + "/" + getRefCount());
+		return (nailclass + ": " + getRunCount() + "/" + getRefCount());
 	}
 }

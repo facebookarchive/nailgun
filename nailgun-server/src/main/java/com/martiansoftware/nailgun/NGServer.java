@@ -19,7 +19,6 @@ package com.martiansoftware.nailgun;
 
 import java.io.InputStream;
 import java.io.PrintStream;
-import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -107,7 +106,7 @@ public class NGServer implements Runnable {
     /**
      * a collection of all classes executed by this server so far
      */
-    private final Map allNailStats;
+    private final Map<String, NailStats> allNailStats;
     
     /**
      * Remember the security manager we start with so we can restore it later
@@ -237,15 +236,16 @@ public class NGServer implements Runnable {
      * @return a NailStats object for the specified class
      */
     private NailStats getOrCreateStatsFor(Class nailClass) {
-        NailStats result = null;
+        NailStats result;
         synchronized (allNailStats) {
-            result = (NailStats) allNailStats.get(nailClass);
+            String nailClassName = nailClass.getName();
+            result = allNailStats.get(nailClassName);
             if (result == null) {
-                result = new NailStats(nailClass);
-                allNailStats.put(nailClass, result);
+                result = new NailStats(nailClassName);
+                allNailStats.put(nailClassName, result);
             }
         }
-        return (result);
+        return result;
     }
 
     /**
@@ -266,10 +266,7 @@ public class NGServer implements Runnable {
      * @param nailClass the nail class that finished
      */
     void nailFinished(Class nailClass) {
-        NailStats stats;
-        synchronized (allNailStats) {
-            stats = (NailStats) allNailStats.get(nailClass);
-        }
+        NailStats stats = getOrCreateStatsFor(nailClass);
         stats.nailFinished();
     }
 
@@ -280,15 +277,15 @@ public class NGServer implements Runnable {
      *
      * @return a snapshot of this NGServer's nail statistics.
      */
-    public Map getNailStats() {
-        Map result = new java.util.TreeMap();
+    public Map<String, NailStats> getNailStats() {
+        Map<String, NailStats> result = new java.util.TreeMap();
         synchronized (allNailStats) {
             for (Iterator i = allNailStats.keySet().iterator(); i.hasNext();) {
-                Class nailclass = (Class) i.next();
-                result.put(nailclass.getName(), ((NailStats) allNailStats.get(nailclass)).clone());
+                String nailclass = (String) i.next();
+                result.put(nailclass, (NailStats)(allNailStats.get(nailclass)).clone());
             }
         }
-        return (result);
+        return result;
     }
 
     /**
@@ -326,33 +323,6 @@ public class NGServer implements Runnable {
         }
 
         sessionPool.shutdown();
-
-        Class[] argTypes = new Class[1];
-        argTypes[0] = NGServer.class;
-        Object[] argValues = new Object[1];
-        argValues[0] = this;
-
-        // make sure that all aliased classes have associated nailstats
-        // so they can be shut down.
-        for (Iterator i = getAliasManager().getAliases().iterator(); i.hasNext();) {
-            Alias alias = (Alias) i.next();
-            getOrCreateStatsFor(alias.getAliasedClass());
-        }
-
-        synchronized (allNailStats) {
-            for (Iterator i = allNailStats.values().iterator(); i.hasNext();) {
-                NailStats ns = (NailStats) i.next();
-                Class nailClass = ns.getNailClass();
-
-                // yes, I know this is lazy, relying upon the exception
-                // to handle the case of no nailShutdown method.
-                try {
-                    Method nailShutdown = nailClass.getMethod("nailShutdown", argTypes);
-                    nailShutdown.invoke(null, argValues);
-                } catch (Throwable toDiscard) {
-                }
-            }
-        }
 
         // restore system streams
         System.setIn(in);
