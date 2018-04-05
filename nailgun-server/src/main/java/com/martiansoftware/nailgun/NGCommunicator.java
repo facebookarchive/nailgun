@@ -17,6 +17,7 @@
 package com.martiansoftware.nailgun;
 
 import java.io.*;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -319,11 +320,29 @@ public class NGCommunicator implements Closeable {
      *
      * @return type of chunk received
      * @throws EOFException if underlying stream / socket is closed which happens on client
-     * disconnection
+     * disconnection or server closure
      * @throws IOException if thrown by the underlying InputStream, or if an unexpected NailGun
      * chunk type is encountered.
      */
     private byte readChunk() throws IOException {
+        try {
+            return readChunkImpl();
+        } catch (SocketException ex) {
+            // Some stream implementations may throw SocketException and not EOFException when socket is terminated by
+            // application
+            // By common agreement, rethrow it as EOFException and let an upstream handler take care.
+            synchronized (orchestratorEvent) {
+                if (shutdown) {
+                    EOFException newException = new EOFException("NGCommunicator is shutting down");
+                    newException.initCause(ex);
+                    throw newException;
+                }
+            }
+            throw ex;
+        }
+    }
+
+    private byte readChunkImpl() throws IOException {
         int chunkLen = in.readInt();
         byte chunkType = in.readByte();
 
