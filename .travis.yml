@@ -9,4 +9,6 @@ python:
   - "3.6"
 
 script:
+  - make ng
+  - make ng.exe
   - scripts/travis_run.sh
