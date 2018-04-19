@@ -3,11 +3,8 @@ addons:
   apt:
     packages:
       - oracle-java8-set-default
-      - mingw-w64
 python:
   - "3.6"
 
 script:
-  - make ng
-  - make ng.exe
   - scripts/travis_run.sh
