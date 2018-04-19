@@ -1,10 +1,8 @@
 #!/bin/sh
 set -eux
 
-ls /usr/bin/
+mvn package
 
-#mvn package
-
-#export PYTHONPATH=.
-#python --version
-#python pynailgun/test_ng.py
+export PYTHONPATH=.
+python --version
+python pynailgun/test_ng.py
