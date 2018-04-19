@@ -1,8 +1,11 @@
 #!/bin/sh
 set -eux
 
-mvn package
+ls /usr
+ls /usr/*mingw*/
 
-export PYTHONPATH=.
-python --version
-python pynailgun/test_ng.py
+#mvn package
+
+#export PYTHONPATH=.
+#python --version
+#python pynailgun/test_ng.py

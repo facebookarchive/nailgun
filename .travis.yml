@@ -4,8 +4,6 @@ addons:
     packages:
       - oracle-java8-set-default
 python:
-  - "2.7"
-  - "3.5"
   - "3.6"
 
 script:
