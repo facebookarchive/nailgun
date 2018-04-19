@@ -17,16 +17,12 @@
  */
 package com.martiansoftware.nailgun;
 
-import java.io.DataInputStream;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -196,66 +192,15 @@ public class NGSession extends Thread {
             LOG.log(Level.FINE, "Client connected");
             try (NGCommunicator comm = new NGCommunicator(socket, heartbeatTimeoutMillis)) {
 
-                DataInputStream sockin = comm.getInputStream();
-
-                // client info - command line arguments and environment
-                List<String> remoteArgs = new ArrayList();
-                Properties remoteEnv = new Properties();
-
-                String cwd = null;            // working directory
-                String command = null;        // alias or class name
-
-                // read everything from the client up to and including the command
-                while (command == null) {
-                    int bytesToRead = sockin.readInt();
-                    byte chunkType = sockin.readByte();
-
-                    byte[] b = new byte[bytesToRead];
-                    sockin.readFully(b);
-                    String line = new String(b, "UTF-8");
-
-                    switch (chunkType) {
-
-                        case NGConstants.CHUNKTYPE_ARGUMENT:
-                            //	command line argument
-                            remoteArgs.add(line);
-                            break;
-
-                        case NGConstants.CHUNKTYPE_ENVIRONMENT:
-                            //	parse environment into property
-                            int equalsIndex = line.indexOf('=');
-                            if (equalsIndex > 0) {
-                                remoteEnv.setProperty(
-                                    line.substring(0, equalsIndex),
-                                    line.substring(equalsIndex + 1));
-                            }
-                            break;
-
-                        case NGConstants.CHUNKTYPE_COMMAND:
-                            // 	command (alias or classname)
-                            command = line;
-                            break;
-
-                        case NGConstants.CHUNKTYPE_WORKINGDIRECTORY:
-                            //	client working directory
-                            cwd = line;
-                            break;
-
-                        default:    // freakout?
-                    }
-                }
+                CommandContext cmdContext = comm.readCommandContext();
 
                 String threadName;
                 if (socket.getInetAddress() != null) {
-                    threadName = socket.getInetAddress().getHostAddress() + ": " + command;
+                    threadName = socket.getInetAddress().getHostAddress() + ": " + cmdContext.getCommand();
                 } else {
-                    threadName = command;
+                    threadName = cmdContext.getCommand();
                 }
                 updateThreadName(threadName);
-
-                // Command and environment is read. Move other communication with client, which is heartbeats and
-                // stdin, to background thread
-                comm.startBackgroundReceive();
 
                 try (
                     InputStream in = new NGInputStream(comm);
@@ -270,19 +215,20 @@ public class NGSession extends Thread {
                     ((ThreadLocalPrintStream) System.err).init(err);
 
                     try {
-                        Alias alias = server.getAliasManager().getAlias(command);
+                        Alias alias = server.getAliasManager().getAlias(cmdContext.getCommand());
                         Class cmdclass;
                         if (alias != null) {
                             cmdclass = alias.getAliasedClass();
                         } else if (server.allowsNailsByClassName()) {
-                            cmdclass = Class.forName(command, true, classLoader);
+                            cmdclass = Class.forName(cmdContext.getCommand(), true, classLoader);
                         } else {
                             cmdclass = server.getDefaultNailClass();
                         }
 
                         Object[] methodArgs = new Object[1];
                         Method mainMethod = null; // will be either main(String[]) or nailMain(NGContext)
-                        String[] cmdlineArgs = remoteArgs.toArray(new String[remoteArgs.size()]);
+                        String[] cmdlineArgs = cmdContext.getCommandArguments().toArray(
+                                new String[cmdContext.getCommandArguments().size()]);
 
                         boolean isStaticNail = true; // See: NonStaticNail.java
 
@@ -306,13 +252,13 @@ public class NGSession extends Thread {
                                 context.in = in;
                                 context.out = out;
                                 context.err = err;
-                                context.setCommand(command);
+                                context.setCommand(cmdContext.getCommand());
                                 context.setNGServer(server);
                                 context.setCommunicator(comm);
-                                context.setEnv(remoteEnv);
+                                context.setEnv(cmdContext.getEnvironmentVariables());
                                 context.setInetAddress(socket.getInetAddress());
                                 context.setPort(socket.getPort());
-                                context.setWorkingDirectory(cwd);
+                                context.setWorkingDirectory(cmdContext.getWorkingDirectory());
                                 methodArgs[0] = context;
                             } catch (NoSuchMethodException toDiscard) {
                                 // that's ok - we'll just try main(String[]) next.
@@ -322,7 +268,6 @@ public class NGSession extends Thread {
                                 mainMethod = cmdclass.getMethod("main", mainSignature);
                                 methodArgs[0] = cmdlineArgs;
                             }
-
                         }
 
                         if (mainMethod != null) {

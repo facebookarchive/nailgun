@@ -20,10 +20,7 @@ import java.io.*;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -112,17 +109,66 @@ public class NGCommunicator implements Closeable {
     }
 
     /**
-     * @return Socket input stream
+     * Get nail command context from the header and start reading for stdin and heartbeats
      */
-    DataInputStream getInputStream() {
-        return in;
+    CommandContext readCommandContext() throws IOException {
+        // client info - command line arguments and environment
+        List<String> remoteArgs = new ArrayList();
+        Properties remoteEnv = new Properties();
+        String cwd = null;            // working directory
+        String command = null;        // alias or class name
+        // read everything from the client up to and including the command
+        while (command == null) {
+            int bytesToRead = in.readInt();
+            byte chunkType = in.readByte();
+
+            byte[] b = new byte[bytesToRead];
+            in.readFully(b);
+            String line = new String(b, "UTF-8");
+
+            switch (chunkType) {
+
+                case NGConstants.CHUNKTYPE_ARGUMENT:
+                    //	command line argument
+                    remoteArgs.add(line);
+                    break;
+
+                case NGConstants.CHUNKTYPE_ENVIRONMENT:
+                    //	parse environment into property
+                    int equalsIndex = line.indexOf('=');
+                    if (equalsIndex > 0) {
+                        remoteEnv.setProperty(
+                                line.substring(0, equalsIndex),
+                                line.substring(equalsIndex + 1));
+                    }
+                    break;
+
+                case NGConstants.CHUNKTYPE_COMMAND:
+                    // 	command (alias or classname)
+                    command = line;
+                    break;
+
+                case NGConstants.CHUNKTYPE_WORKINGDIRECTORY:
+                    //	client working directory
+                    cwd = line;
+                    break;
+
+                default:    // freakout?
+            }
+        }
+
+        // Command and environment is read. Move other communication with client, which is heartbeats and
+        // stdin, to background thread
+        startBackgroundReceive();
+
+        return new CommandContext(command, cwd, remoteEnv, remoteArgs);
     }
 
     /**
      * Call this to move all reads, like heartbeats and stdin, to be performed by background thread. This method should
      * only be called once, as header data is read from the input stream.
      */
-    void startBackgroundReceive() {
+    private void startBackgroundReceive() {
         // Read timeout, including heartbeats, should be handled by socket.
         // However Java Socket/Stream API does not enforce that. To stay on safer side,
         // use timeout on a future
