@@ -5,7 +5,7 @@
 
 # This is where the mingw32 compiler exists in Ubuntu 8.04.
 # Your compiler location may vary.
-WIN32_CC=/usr/bin/i586-mingw32msvc-gcc
+WIN32_CC=/usr/bin/x86_64-w64-mingw32-gcc
 
 CFLAGS=-Wall -pedantic -O2
 SRCDIR=nailgun-client
