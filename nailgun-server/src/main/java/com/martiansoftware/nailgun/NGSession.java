@@ -17,16 +17,14 @@
  */
 package com.martiansoftware.nailgun;
 
-import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
@@ -103,7 +101,6 @@ public class NGSession extends Thread {
         } catch (SecurityException e) {
             throw e;
         }
-
     }
 
     /**
@@ -197,11 +194,12 @@ public class NGSession extends Thread {
         Socket socket = nextSocket();
         while (socket != null) {
             LOG.log(Level.FINE, "Client connected");
-            try (DataInputStream sockin = new DataInputStream(socket.getInputStream());
-                DataOutputStream sockout = new DataOutputStream(socket.getOutputStream())) {
+            try (NGCommunicator comm = new NGCommunicator(socket, heartbeatTimeoutMillis)) {
+
+                DataInputStream sockin = comm.getInputStream();
 
                 // client info - command line arguments and environment
-                List remoteArgs = new java.util.ArrayList();
+                List<String> remoteArgs = new ArrayList();
                 Properties remoteEnv = new Properties();
 
                 String cwd = null;            // working directory
@@ -255,19 +253,16 @@ public class NGSession extends Thread {
                 }
                 updateThreadName(threadName);
 
-                // can't create NGCommunicator until we've received a command, because at
-                // that point the stream from the client will only include stdin and stdin-eof
-                // chunks
+                // Command and environment is read. Move other communication with client, which is heartbeats and
+                // stdin, to background thread
+                comm.startBackgroundReceive();
+
                 try (
-                    NGCommunicator comm = new NGCommunicator(sockin, sockout,
-                        heartbeatTimeoutMillis);
                     InputStream in = new NGInputStream(comm);
                     PrintStream out = new PrintStream(
                         new NGOutputStream(comm, NGConstants.CHUNKTYPE_STDOUT));
                     PrintStream err = new PrintStream(
                         new NGOutputStream(comm, NGConstants.CHUNKTYPE_STDERR));
-                    PrintStream exit = new PrintStream(
-                        new NGOutputStream(comm, NGConstants.CHUNKTYPE_EXIT));
                 ) {
                     // ThreadLocal streams for System.in/out/err redirection
                     ((ThreadLocalInputStream) System.in).init(in);
@@ -276,7 +271,7 @@ public class NGSession extends Thread {
 
                     try {
                         Alias alias = server.getAliasManager().getAlias(command);
-                        Class cmdclass = null;
+                        Class cmdclass;
                         if (alias != null) {
                             cmdclass = alias.getAliasedClass();
                         } else if (server.allowsNailsByClassName()) {
@@ -287,8 +282,7 @@ public class NGSession extends Thread {
 
                         Object[] methodArgs = new Object[1];
                         Method mainMethod = null; // will be either main(String[]) or nailMain(NGContext)
-                        String[] cmdlineArgs = (String[]) remoteArgs
-                            .toArray(new String[remoteArgs.size()]);
+                        String[] cmdlineArgs = remoteArgs.toArray(new String[remoteArgs.size()]);
 
                         boolean isStaticNail = true; // See: NonStaticNail.java
 
@@ -302,13 +296,9 @@ public class NGSession extends Thread {
                         }
 
                         if (!isStaticNail) {
-
-                            mainMethod = cmdclass
-                                .getMethod("nailMain", new Class[]{String[].class});
+                            mainMethod = cmdclass.getMethod("nailMain", new Class[]{String[].class});
                             methodArgs[0] = cmdlineArgs;
-
                         } else {
-
                             try {
                                 mainMethod = cmdclass.getMethod("nailMain", nailMainSignature);
                                 NGContext context = new NGContext();
@@ -317,7 +307,6 @@ public class NGSession extends Thread {
                                 context.out = out;
                                 context.err = err;
                                 context.setCommand(command);
-                                context.setExitStream(exit);
                                 context.setNGServer(server);
                                 context.setCommunicator(comm);
                                 context.setEnv(remoteEnv);
@@ -338,7 +327,6 @@ public class NGSession extends Thread {
 
                         if (mainMethod != null) {
                             server.nailStarted(cmdclass);
-                            NGSecurityManager.setExit(exit);
 
                             try {
                                 if (isStaticNail) {
@@ -348,30 +336,27 @@ public class NGSession extends Thread {
                                 }
                             } catch (InvocationTargetException ite) {
                                 throw (ite.getCause());
-                            } catch (InstantiationException e) {
-                                throw (e);
-                            } catch (IllegalAccessException e) {
-                                throw (e);
-                            } catch (Throwable t) {
-                                throw (t);
                             } finally {
                                 server.nailFinished(cmdclass);
                             }
-                            exit.println(0);
+
+                            // send exit code 0 to the client; if nail previously called NGSession.exit() or
+                            // System.exit() explicitly then this will do nothing
+                            comm.exit(NGConstants.EXIT_SUCCESS);
                         }
 
                     } catch (NGExitException exitEx) {
-                        LOG.log(Level.INFO, "Server cleanly exited with status {0}",
+                        // We got here if nail called System.exit(). Just quit with provided exit code.
+                        LOG.log(Level.INFO, "Nail cleanly exited with status {0}",
                             exitEx.getStatus());
-                        exit.println(exitEx.getStatus());
+                        comm.exit(exitEx.getStatus());
                         server.out.println(
                             Thread.currentThread().getName() + " exited with status " + exitEx
                                 .getStatus());
                     } catch (Throwable t) {
-                        LOG.log(Level.INFO, "Server unexpectedly exited with unhandled exception",
+                        LOG.log(Level.INFO, "Nail raised unhandled exception",
                             t);
-                        t.printStackTrace();
-                        exit.println(NGConstants.EXIT_EXCEPTION); // remote exception constant
+                        comm.exit(NGConstants.EXIT_EXCEPTION); // remote exception constant
                     }
                 }
 

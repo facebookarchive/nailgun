@@ -32,6 +32,10 @@ public class NGConstants {
      */
     public static final int DEFAULT_PORT = 2113;
     /**
+     * The exit code sent to clients if nail completed successfully
+     */
+    public static final int EXIT_SUCCESS = 0;
+    /**
      * The exit code sent to clients if an exception occurred on the server
      */
     public static final int EXIT_EXCEPTION = 899;

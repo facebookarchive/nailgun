@@ -66,11 +66,6 @@ public class NGContext {
     private String[] args = null;
 
     /**
-     * A stream to which a client exit code can be printed
-     */
-    private PrintStream exitStream = null;
-
-    /**
      * The NGServer that accepted this connection
      */
     private NGServer server = null;
@@ -103,10 +98,6 @@ public class NGContext {
      * Creates a new, empty NGContext
      */
     public NGContext() {
-    }
-
-    public void setExitStream(PrintStream exitStream) {
-        this.exitStream = exitStream;
     }
 
     public void setCommunicator(NGCommunicator comm) {
@@ -231,7 +222,7 @@ public class NGContext {
      * @param exitCode the exit code with which the client should exit
      */
     public void exit(int exitCode) {
-        exitStream.println(exitCode);
+        communicator.exit(exitCode);
     }
 
     /**
