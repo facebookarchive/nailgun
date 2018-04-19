@@ -24,6 +24,7 @@
 #ifdef WIN32
 	#include <direct.h>
 	#include <winsock2.h>
+	#include <ws2tcpip.h>
 #else
 	#include <arpa/inet.h>
 	#include <netdb.h>
@@ -60,7 +61,7 @@
 	typedef unsigned int SOCKET;
 #endif
 
-#ifdef __APPLE__
+#ifndef MSG_NOSIGNAL
   #define SEND_FLAGS 0
 #else
   #define SEND_FLAGS MSG_NOSIGNAL
