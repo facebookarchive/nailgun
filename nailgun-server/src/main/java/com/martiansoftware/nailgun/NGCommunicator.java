@@ -17,12 +17,10 @@
 package com.martiansoftware.nailgun;
 
 import java.io.*;
+import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -38,6 +36,7 @@ public class NGCommunicator implements Closeable {
     private static final Logger LOG = Logger.getLogger(NGCommunicator.class.getName());
     private final ExecutorService orchestratorExecutor;
     private final ExecutorService readExecutor;
+    private final Socket socket;
     private final DataInputStream in;
     private final DataOutputStream out;
     private final Object readLock = new Object();
@@ -47,28 +46,33 @@ public class NGCommunicator implements Closeable {
     private InputStream stdin = null;
     private boolean eof = false;
     private boolean closed = false;
+    private boolean inClosed = false;
+    private boolean outClosed = false;
+    private boolean isExited = false;
     private int remaining = 0;
     private AtomicBoolean clientConnected = new AtomicBoolean(true);
     private final Set<NGClientListener> clientListeners = new HashSet<>();
     private final Set<NGHeartbeatListener> heartbeatListeners = new HashSet<>();
     private static final long TERMINATION_TIMEOUT_MS = 1000;
+    private final int heartbeatTimeoutMillis;
 
     /**
-     * Creates a new NGCommunicator wrapping the specified InputStream. Also sets up a timer to
+     * Creates a new NGCommunicator wrapping the specified Socket. Also sets up a timer to
      * periodically consume heartbeats sent from the client and call registered NGClientListeners if
      * a client disconnection is detected.
      *
-     * @param in Socket read stream, will be closed with NGCommunicator's close()
-     * @param out Socket write stream, will be closed with NGCommunicator's close()
+     * @param socket Socket used to comminicate with the client, will be closed on close()
      * @param heartbeatTimeoutMillis the interval between heartbeats before considering the client
      * disconnected
      */
-    public NGCommunicator(
-        DataInputStream in,
-        DataOutputStream out,
-        final int heartbeatTimeoutMillis) {
-        this.in = in;
-        this.out = out;
+    NGCommunicator(
+        Socket socket,
+        final int heartbeatTimeoutMillis) throws IOException {
+
+        this.heartbeatTimeoutMillis = heartbeatTimeoutMillis;
+        this.socket = socket;
+        in = new DataInputStream(socket.getInputStream());
+        out = new DataOutputStream(socket.getOutputStream());
 
         /** Thread factory that overrides name and priority for executor threads */
         final class NamedThreadFactory implements ThreadFactory {
@@ -83,7 +87,7 @@ public class NGCommunicator implements Closeable {
             public Thread newThread(Runnable r) {
                 SecurityManager s = System.getSecurityManager();
                 ThreadGroup group =
-                    (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
+                        (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
                 Thread t = new Thread(group, r, this.threadName, 0);
                 if (t.isDaemon()) {
                     t.setDaemon(false);
@@ -99,10 +103,72 @@ public class NGCommunicator implements Closeable {
 
         Thread mainThread = Thread.currentThread();
         this.orchestratorExecutor = Executors.newSingleThreadExecutor(
-            new NamedThreadFactory(mainThread.getName() + " (NGCommunicator orchestrator)"));
+                new NamedThreadFactory(mainThread.getName() + " (NGCommunicator orchestrator)"));
         this.readExecutor = Executors.newSingleThreadExecutor(
-            new NamedThreadFactory(mainThread.getName() + " (NGCommunicator reader)"));
+                new NamedThreadFactory(mainThread.getName() + " (NGCommunicator reader)"));
+    }
 
+    /**
+     * Get nail command context from the header and start reading for stdin and heartbeats
+     */
+    CommandContext readCommandContext() throws IOException {
+        // client info - command line arguments and environment
+        List<String> remoteArgs = new ArrayList();
+        Properties remoteEnv = new Properties();
+        String cwd = null;            // working directory
+        String command = null;        // alias or class name
+        // read everything from the client up to and including the command
+        while (command == null) {
+            int bytesToRead = in.readInt();
+            byte chunkType = in.readByte();
+
+            byte[] b = new byte[bytesToRead];
+            in.readFully(b);
+            String line = new String(b, "UTF-8");
+
+            switch (chunkType) {
+
+                case NGConstants.CHUNKTYPE_ARGUMENT:
+                    //	command line argument
+                    remoteArgs.add(line);
+                    break;
+
+                case NGConstants.CHUNKTYPE_ENVIRONMENT:
+                    //	parse environment into property
+                    int equalsIndex = line.indexOf('=');
+                    if (equalsIndex > 0) {
+                        remoteEnv.setProperty(
+                                line.substring(0, equalsIndex),
+                                line.substring(equalsIndex + 1));
+                    }
+                    break;
+
+                case NGConstants.CHUNKTYPE_COMMAND:
+                    // 	command (alias or classname)
+                    command = line;
+                    break;
+
+                case NGConstants.CHUNKTYPE_WORKINGDIRECTORY:
+                    //	client working directory
+                    cwd = line;
+                    break;
+
+                default:    // freakout?
+            }
+        }
+
+        // Command and environment is read. Move other communication with client, which is heartbeats and
+        // stdin, to background thread
+        startBackgroundReceive();
+
+        return new CommandContext(command, cwd, remoteEnv, remoteArgs);
+    }
+
+    /**
+     * Call this to move all reads, like heartbeats and stdin, to be performed by background thread. This method should
+     * only be called once, as header data is read from the input stream.
+     */
+    private void startBackgroundReceive() {
         // Read timeout, including heartbeats, should be handled by socket.
         // However Java Socket/Stream API does not enforce that. To stay on safer side,
         // use timeout on a future
@@ -233,30 +299,100 @@ public class NGCommunicator implements Closeable {
     }
 
     /**
-     * Stop the thread reading from the NailGun client
+     * Signal nail completion to the client. It will close communication socket afterwards, so any read or write would
+     * result in an error
+     * This method is idempotent and need to be called only once. Any subsequent call will result in noop.
+     * @param exitCode exit code as output by Nailgun client
      */
-
-    public void close() throws IOException {
-        if (closed) {
+    void exit(int exitCode) {
+        if (isExited) {
             return;
         }
-        closed = true;
+        // First, stop reading from the socket. If we won't do that then client receives an exit code and terminates
+        // the socket on its end, causing readExecutor to throw
+        try {
+            stopIn();
+        } catch(IOException ex) {
+            LOG.log(Level.WARNING, "Unable to close socket for reading while sending final exit code", ex);
+        }
+
+        // send the command - client will exit
+        try (PrintStream exit = new PrintStream(new NGOutputStream(this, NGConstants.CHUNKTYPE_EXIT))) {
+            exit.println(exitCode);
+        }
+        isExited = true;
+
+        // close writing too - there is no point to send anything to client after the resulting exit code
+        try {
+            stopOut();
+        } catch(IOException ex) {
+            LOG.log(Level.WARNING, "Unable to close socket for writing while sending final exit code", ex);
+        }
+    }
+
+    /**
+     * Stop the thread reading stdin from the NailGun client
+     */
+    private void stopIn() throws IOException {
+        if (inClosed) {
+            return;
+        }
+        inClosed = true;
+
+        LOG.log(Level.FINE, "Shutting down socket for input");
+
         // unblock all waiting readers
         setEof();
 
-        // signal orchestrator thread it is ok to quit now
+        // signal orchestrator thread it is ok to quit now as there will be no more input
         synchronized (orchestratorEvent) {
             shutdown = true;
             orchestratorEvent.notifyAll();
         }
 
-        // close underlying socket streams - that will cause readExecutor to throw EOFException
-        // and exit orchestrator thread main loop
+        // close socket for input - that will cause readExecutor to throw EOFException
+        // and exit orchestrator thread main loop; client can still write to the socket
+        socket.shutdownInput();
+    }
+
+    /**
+     * Close socket for output and terminate connection, any attempt to write anything to it after that will yield to
+     * IOException
+     */
+    private void stopOut() throws IOException {
+        if (outClosed) {
+            return;
+        }
+        outClosed = true;
+        
+        LOG.log(Level.FINE, "Shutting down socket for output");
+
+        // close socket for output - that will initiate normal socket close procedure; in case of TCP socket this is
+        // a buffer flush and TCP termination
+        socket.shutdownOutput();
+    }
+
+    /**
+     * Closes communication socket gracefully
+     */
+    public void close() throws IOException {
+        if (closed) {
+            return;
+        }
+        closed = true;
+
+        stopIn();
+        stopOut();
+
+        // socket streams and socket itself should be already closed with stopIn() and stopOut()
+        // but because it is idempotent, let's be good citizens and close corresponding streams as well
         in.close();
         out.close();
 
         terminateExecutor(readExecutor, "read");
         terminateExecutor(orchestratorExecutor, "orchestrator");
+
+        socket.close();
     }
 
     private static void terminateExecutor(ExecutorService service, String which) {
@@ -397,7 +533,7 @@ public class NGCommunicator implements Closeable {
      * @return number of bytes read or -1 if no more data is available
      * @throws IOException in case of socket error
      */
-    public int receive(byte[] b, int offset, int length)
+    int receive(byte[] b, int offset, int length)
         throws IOException, InterruptedException {
 
         synchronized (readLock) {
@@ -429,7 +565,7 @@ public class NGCommunicator implements Closeable {
     /**
      * Send data to the client
      */
-    public void send(byte streamCode, byte[] b, int offset, int len) throws IOException {
+    void send(byte streamCode, byte[] b, int offset, int len) throws IOException {
         synchronized (writeLock) {
             out.writeInt(len);
             out.writeByte(streamCode);
@@ -449,14 +585,14 @@ public class NGCommunicator implements Closeable {
     /**
      * @return true if interval since last read is less than heartbeat timeout interval.
      */
-    public boolean isClientConnected() {
+    boolean isClientConnected() {
         return clientConnected.get();
     }
 
     /**
      * @return number of bytes in internal stdin buffer
      */
-    public int available() {
+    int available() {
         synchronized (readLock) {
             return remaining;
         }
@@ -467,7 +603,7 @@ public class NGCommunicator implements Closeable {
      *
      * @param listener the {@link NGClientListener} to be notified of client events.
      */
-    public void addClientListener(NGClientListener listener) {
+    void addClientListener(NGClientListener listener) {
         synchronized (orchestratorEvent) {
             clientListeners.add(listener);
 
@@ -481,7 +617,7 @@ public class NGCommunicator implements Closeable {
     /**
      * @param listener the {@link NGClientListener} to no longer be notified of client events
      */
-    public void removeClientListener(NGClientListener listener) {
+    void removeClientListener(NGClientListener listener) {
         synchronized (orchestratorEvent) {
             clientListeners.remove(listener);
         }
@@ -490,7 +626,7 @@ public class NGCommunicator implements Closeable {
     /**
      * Do not notify anymore about client disconnects
      */
-    public void removeAllClientListeners() {
+    void removeAllClientListeners() {
         synchronized (orchestratorEvent) {
             clientListeners.clear();
         }
@@ -499,7 +635,7 @@ public class NGCommunicator implements Closeable {
     /**
      * @param listener the {@link NGHeartbeatListener} to be notified of heartbeats
      */
-    public void addHeartbeatListener(NGHeartbeatListener listener) {
+    void addHeartbeatListener(NGHeartbeatListener listener) {
         synchronized (heartbeatListeners) {
             heartbeatListeners.add(listener);
         }
@@ -508,7 +644,7 @@ public class NGCommunicator implements Closeable {
     /**
      * @param listener the {@link NGHeartbeatListener} to no longer be notified of heartbeats
      */
-    public void removeHeartbeatListener(NGHeartbeatListener listener) {
+    void removeHeartbeatListener(NGHeartbeatListener listener) {
         synchronized (heartbeatListeners) {
             heartbeatListeners.remove(listener);
         }

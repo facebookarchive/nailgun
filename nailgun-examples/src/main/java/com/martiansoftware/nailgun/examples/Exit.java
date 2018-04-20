@@ -18,6 +18,9 @@ limitations under the License.
 
 package com.martiansoftware.nailgun.examples;
 
+/**
+ * Finish nail with provided exit code
+ */
 public class Exit {
 
 	public static void main (String[] args) {
