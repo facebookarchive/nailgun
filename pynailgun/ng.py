@@ -17,7 +17,7 @@
 from __future__ import print_function
 import ctypes
 import platform
-import optparse
+import argparse
 import os
 import os.path
 import select
@@ -877,13 +877,13 @@ def main():
     default_nailgun_server = os.environ.get('NAILGUN_SERVER', '127.0.0.1')
     default_nailgun_port = int(os.environ.get('NAILGUN_PORT', NAILGUN_PORT_DEFAULT))
 
-    parser = optparse.OptionParser(usage='%prog [options] cmd arg1 arg2 ...')
-    parser.add_option('--nailgun-server', default=default_nailgun_server)
-    parser.add_option('--nailgun-port', type='int', default=default_nailgun_port)
-    parser.add_option('--nailgun-filearg')
-    parser.add_option('--nailgun-showversion', action='store_true')
-    parser.add_option('--nailgun-help', action='help')
-    (options, args) = parser.parse_args()
+    parser = argparse.ArgumentParser(usage='python ng.py [options] cmd arg1 arg2 ...', add_help=False)
+    parser.add_argument('--nailgun-server', default=default_nailgun_server)
+    parser.add_argument('--nailgun-port', type=int, default=default_nailgun_port)
+    parser.add_argument('--nailgun-filearg')
+    parser.add_argument('--nailgun-showversion', action='store_true')
+    parser.add_argument('--nailgun-help', action='help')
+    (options, args) = parser.parse_known_args()
 
     if options.nailgun_showversion:
         print('NailGun client version ' + NAILGUN_VERSION)
