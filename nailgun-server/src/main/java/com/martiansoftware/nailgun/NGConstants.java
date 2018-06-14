@@ -108,6 +108,11 @@ public class NGConstants {
     public static final short HEARTBEAT_TIMEOUT_MILLIS = 10000;
 
     /**
+     * Maximum time to wait for a Nailgun session to terminate.
+     */
+    public static final int SESSION_TERMINATION_TIMEOUT_MILLIS = 30000;
+
+    /**
      * Maximum chunk len sent from client.
      */
     public static final short MAXIMUM_CHUNK_LENGTH = 2048;
