@@ -66,6 +66,7 @@ CHUNKTYPE_HEARTBEAT = b'H'
 NSEC_PER_SEC = 1000000000
 DEFAULT_HEARTBEAT_INTERVAL_SEC = 0.5
 SELECT_MAX_BLOCK_TIME_SEC = 1.0
+SEND_THREAD_WAIT_TERMINATION_SEC = 5.0
 
 # We need to support Python 2.6 hosts which lack memoryview().
 HAS_MEMORYVIEW = 'memoryview' in dir(builtin)
@@ -410,6 +411,7 @@ class NailgunConnection(object):
 
         self.error_lock = RLock()
         self.error = None
+        self.error_traceback = None
         
         self.stdin_condition = Condition()
         self.stdin_thread = Thread(target=stdin_thread_main, args=(self,))
@@ -443,9 +445,8 @@ class NailgunConnection(object):
         try:
             return self._send_command_and_read_response(cmd, cmd_args, filearg, env, cwd)
         except socket.error as e:
-            raise NailgunException(
-                'Server disconnected unexpectedly: {0}'.format(e),
-                NailgunException.CONNECTION_BROKEN)
+            re_raise(NailgunException('Server disconnected unexpectedly: {0}'.format(e),
+                    NailgunException.CONNECTION_BROKEN))
 
     def _send_command_and_read_response(self, cmd, cmd_args, filearg, env, cwd):
         self.stdin_thread.start()
@@ -505,10 +506,12 @@ class NailgunConnection(object):
         # if daemon thread threw, rethrow here
         if self.shutdown_event.is_set():
             e = None
+            e_tb = None
             with self.error_lock:
                 e = self.error
+                e_tb = self.error_traceback
             if e is not None:
-                raise e
+                re_raise(e, e_tb)
 
 
     def _send_chunk(self, buf, chunk_type):
@@ -656,6 +659,24 @@ class NailgunConnection(object):
                  'Unexpected chunk type: {0}'.format(chunk_type),
                  NailgunException.UNEXPECTED_CHUNKTYPE)
 
+    def wait_termination(self, timeout):
+        """
+        Wait for shutdown event to be signalled within specified interval
+        Return True if termination was signalled, False otherwise
+        """
+        wait_time = timeout
+        start = monotonic_time_nanos()
+        with self.send_condition:
+            while True:
+                if self.shutdown_event.is_set():
+                    return True
+                self.send_condition.wait(wait_time)
+                elapsed = (monotonic_time_nanos() - start) * 1.0 / NSEC_PER_SEC
+                wait_time = timeout - elapsed
+                if wait_time <= 0:
+                    return False
+        return False
+
     def __enter__(self):
         return self
 
@@ -739,16 +760,34 @@ def send_thread_main(conn):
     try:
         header_buf = ctypes.create_string_buffer(CHUNK_HEADER_LEN)
         while True:
+            connection_error = None
             while not conn.send_queue.empty():
                 # only this thread can deplete the queue, so it is safe to use blocking get()
                 (chunk_type, buf) = conn.send_queue.get()
                 struct.pack_into('>ic', header_buf, 0, len(buf), chunk_type)
-                conn.transport.sendall(header_buf.raw)
-                conn.transport.sendall(to_bytes(buf))
+                bbuf = to_bytes(buf)
+
+                # these chunk types are not required for server to accept and process and server may terminate
+                # any time without waiting for them
+                is_required = chunk_type not in (CHUNKTYPE_HEARTBEAT, CHUNKTYPE_STDIN, CHUNKTYPE_STDIN_EOF)
+
+                try:
+                    conn.transport.sendall(header_buf.raw)
+                    conn.transport.sendall(bbuf)
+                except socket.error as e:
+                    # The server may send termination signal and close the socket immediately; attempt to write
+                    # to such a socket (i.e. heartbeats) results in an error (SIGPIPE)
+                    # Nailgun protocol is not duplex so the server does not wait on client to acknowledge
+                    # We catch an exception and ignore it if termination has happened shortly afterwards
+                    if not is_required and conn.wait_termination(SEND_THREAD_WAIT_TERMINATION_SEC):
+                        return
+                    raise
 
             with conn.send_condition:
                 if conn.shutdown_event.is_set():
                     return
+                if not conn.send_queue.empty():
+                    continue
                 conn.send_condition.wait()
                 if conn.shutdown_event.is_set():
                     return
@@ -756,6 +795,7 @@ def send_thread_main(conn):
         # save exception to rethrow on main thread
         with conn.error_lock:
             conn.error = e
+            conn.error_traceback = sys.exc_info()[2]
         conn.shutdown_event.set()
 
 
@@ -790,6 +830,7 @@ def stdin_thread_main(conn):
         # save exception to rethrow on main thread
         with conn.error_lock:
             conn.error = e
+            conn.error_traceback = sys.exc_info()[2]
         conn.shutdown_event.set()
 
 
@@ -800,18 +841,19 @@ def heartbeat_thread_main(conn):
     """
     try:
         while True:
-            conn._send_heartbeat()
-
             with conn.heartbeat_condition:
                 if conn.shutdown_event.is_set():
                     return
                 conn.heartbeat_condition.wait(conn.heartbeat_interval_sec)
                 if conn.shutdown_event.is_set():
                     return
+            conn._send_heartbeat()
+
     except Exception as e:
         # save exception to rethrow on main thread
         with conn.error_lock:
             conn.error = e
+            conn.error_traceback = sys.exc_info()[2]
         conn.shutdown_event.set()
 
 
@@ -828,9 +870,9 @@ def make_nailgun_transport(nailgun_server, nailgun_port=None, cwd=None):
             try:
                 s = socket.socket(socket.AF_UNIX)
             except socket.error as msg:
-                raise NailgunException(
+                re_raise(NailgunException(
                     'Could not create local socket connection to server: {0}'.format(msg),
-                    NailgunException.SOCKET_FAILED)
+                    NailgunException.SOCKET_FAILED))
             socket_addr = nailgun_server[6:]
             prev_cwd = os.getcwd()
             try:
@@ -839,9 +881,9 @@ def make_nailgun_transport(nailgun_server, nailgun_port=None, cwd=None):
                 s.connect(socket_addr)
                 transport = UnixTransport(s)
             except socket.error as msg:
-                raise NailgunException(
+                re_raise(NailgunException(
                     'Could not connect to local server at {0}: {1}'.format(socket_addr, msg),
-                    NailgunException.CONNECT_FAILED)
+                    NailgunException.CONNECT_FAILED))
             finally:
                 if cwd is not None:
                     os.chdir(prev_cwd)
@@ -868,6 +910,23 @@ def make_nailgun_transport(nailgun_server, nailgun_port=None, cwd=None):
             'Could not connect to server {0}:{1}'.format(nailgun_server, nailgun_port),
             NailgunException.CONNECT_FAILED)
     return transport
+
+if is_py2:
+    exec('''
+def re_raise(ex, ex_trace = None):
+    """
+    Throw ex and preserve stack trace of original exception if we run on Python 2
+    """
+    if ex_trace is None:
+        ex_trace = sys.exc_info()[2]
+    raise ex, None, ex_trace
+    ''')
+else:
+    def re_raise(ex, ex_trace = None):
+        """
+        Throw ex and preserve stack trace of original exception if we run on Python 2
+        """
+        raise ex
 
 
 def main():

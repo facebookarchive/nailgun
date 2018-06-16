@@ -114,7 +114,8 @@ public class NGSession extends Thread {
     }
 
     /**
-     * Shuts down this NGSession gracefully
+     * Shuts down this NGSession gracefully by signalling the main nail thread to interrupt. The function exists
+     * immediately, it is up to the nail to process interruption and return
      */
     void shutdown() {
         synchronized (lock) {
@@ -122,6 +123,7 @@ public class NGSession extends Thread {
             nextSocket = null;
             lock.notifyAll();
         }
+        interrupt();
     }
 
     /**
@@ -295,9 +297,6 @@ public class NGSession extends Thread {
                         LOG.log(Level.INFO, "Nail cleanly exited with status {0}",
                             exitEx.getStatus());
                         comm.exit(exitEx.getStatus());
-                        server.out.println(
-                            Thread.currentThread().getName() + " exited with status " + exitEx
-                                .getStatus());
                     } catch (Throwable t) {
                         LOG.log(Level.INFO, "Nail raised unhandled exception",
                             t);

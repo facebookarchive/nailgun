@@ -1,4 +1,4 @@
-/*   
+/*
 
  Copyright 2004-2012, Martian Software, Inc.
 
@@ -17,6 +17,9 @@
  */
 package com.martiansoftware.nailgun;
 
+import com.martiansoftware.nailgun.builtins.DefaultNail;
+import com.sun.jna.Platform;
+
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.InetAddress;
@@ -25,10 +28,10 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import com.martiansoftware.nailgun.builtins.DefaultNail;
-import com.sun.jna.Platform;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * <p>Listens for new connections from NailGun clients and launches NGSession
@@ -42,72 +45,74 @@ import com.sun.jna.Platform;
  */
 public class NGServer implements Runnable {
 
+    private static final Logger LOG = Logger.getLogger(NGServer.class.getName());
+
     /**
      * Default size for thread pool
      */
-    public static final int DEFAULT_SESSIONPOOLSIZE = 10;
-    
+    public static final int DEFAULT_SESSIONPOOLSIZE = 2;
+
     /**
      * The address on which to listen
      */
     private final NGListeningAddress listeningAddress;
-    
+
     /**
      * The socket doing the listening
      */
     private ServerSocket serversocket;
-    
+
     /**
      * True if this NGServer has received instructions to shut down
      */
     private final AtomicBoolean shutdown = new AtomicBoolean(false);
-    
+
     /**
      * True if this NGServer has been started and is accepting connections
      */
     private final AtomicBoolean running = new AtomicBoolean(false);
-    
+
     /**
      * This NGServer's AliasManager, which maps aliases to classes
      */
     private final AliasManager aliasManager;
-    
+
     /**
      * If true, fully-qualified classnames are valid commands
      */
     private boolean allowNailsByClassName = true;
-    
+
     /**
      * The default class to use if an invalid alias or classname is specified by
      * the client.
      */
     private Class defaultNailClass = null;
-    
+
     /**
      * A pool of NGSessions ready to handle client connections
      */
     private final NGSessionPool sessionPool;
-    
+
     /**
      * <code>System.out</code> at the time of the NGServer's creation
      */
     public final PrintStream out = System.out;
-    
+
     /**
      * <code>System.err</code> at the time of the NGServer's creation
      */
     public final PrintStream err = System.err;
-    
+
     /**
      * <code>System.in</code> at the time of the NGServer's creation
      */
     public final InputStream in = System.in;
-    
+
     /**
      * a collection of all classes executed by this server so far
      */
     private final Map<String, NailStats> allNailStats;
-    
+
     /**
      * Remember the security manager we start with so we can restore it later
      */
@@ -298,6 +303,15 @@ public class NGServer implements Runnable {
     }
 
     /**
+     * Signal Nailgun server that it needs to stop listening to incoming nail requests and shut down itself after it
+     * processes all current nails
+     * The function returns immediately, actual shutdown will happen later
+     */
+    public void signalExit() {
+        ForkJoinPool.commonPool().submit(() -> shutdown(true));
+    }
+
+    /**
      * <p>Shuts down the server. The server will stop listening and its thread
      * will finish. Any running nails will be allowed to finish.</p>
      *
@@ -307,10 +321,7 @@ public class NGServer implements Runnable {
      * parameter.</p>
      *
      * @param exitVM if true, this method will also exit the JVM after calling
-     * nailShutdown() on any nails. This may prevent currently running nails
-     * from exiting gracefully, but may be necessary in order to perform some
-     * tasks, such as shutting down any AWT or Swing threads implicitly launched
-     * by your nails.
+     * nailShutdown() on any nails.
      */
     public void shutdown(boolean exitVM) {
         if (shutdown.getAndSet(true)) {
@@ -319,10 +330,17 @@ public class NGServer implements Runnable {
 
         try {
             serversocket.close();
-        } catch (Throwable toDiscard) {
+        } catch (Throwable ex) {
+            LOG.log(Level.WARNING, "Exception closing server socket on Nailgun server shutdown", ex);
         }
 
-        sessionPool.shutdown();
+        // close all idle sessions and wait for all running sessions to complete
+        try {
+            sessionPool.shutdown();
+        } catch (Throwable ex) {
+            // we are going to die anyways so let's just continue
+            LOG.log(Level.WARNING, "Exception shutting down Nailgun server", ex);
+        }
 
         // restore system streams
         System.setIn(in);

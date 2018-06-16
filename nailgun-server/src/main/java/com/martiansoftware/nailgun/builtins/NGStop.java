@@ -30,7 +30,9 @@ import com.martiansoftware.nailgun.NGContext;
 public class NGStop {
 
 	public static void nailMain(NGContext context) {
-		context.getNGServer().shutdown(true);
+		// just let the server know it needs to shut down
+		// shutdown will happen asynchronously allowing this nail to cleanly exit with status 0
+		context.getNGServer().signalExit();
 	}
 
 }

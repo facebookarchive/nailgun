@@ -22,20 +22,18 @@ import com.martiansoftware.nailgun.NGContext;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Print one hash per second to standard out while the client is running. Whenever heartbeat is
- * received from client, print H.
+ * Print H for each heartbeat received
  */
 public class Heartbeat {
 
     public static void nailMain(final NGContext context) {
-        long start = System.nanoTime();
-        long run_nanos = Long.MAX_VALUE;
+        long runTimeout = Long.MAX_VALUE;
         String[] args = context.getArgs();
         if (args.length > 0) {
             // first argument is the number of milliseconds to run a command
             // if omitted it will never interrupt by itself
             try {
-                run_nanos = Long.parseUnsignedLong(args[0]) * 1000 * 1000;
+                runTimeout = Long.parseUnsignedLong(args[0]);
             } catch (Exception e) {}
         }
 
@@ -53,10 +51,8 @@ public class Heartbeat {
             context.addHeartbeatListener(() -> context.out.print("H"));
 
             synchronized (lock) {
-                // print hashes every second when client is active
-                while (!shutdown.get() && (System.nanoTime() - start) < run_nanos) {
-                    context.out.print("S");
-                    lock.wait(1000);
+                if (!shutdown.get()) {
+                    lock.wait(runTimeout);
                 }
             }
         } catch (InterruptedException ignored) {

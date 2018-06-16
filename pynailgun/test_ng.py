@@ -238,6 +238,18 @@ class TestNailgunConnectionMain(TestNailgunConnection):
             exit_code = c.send_command('com.martiansoftware.nailgun.examples.Heartbeat', ['3000'])
         self.assertTrue(output.getvalue().count('H') == 0)
 
+    def test_stress_nailgun_socket_close_without_race_condition(self):
+        output = StringIO()
+        for i in range (1000):
+            with NailgunConnection(
+                    self.transport_address,
+                    stderr=None,
+                    stdin=None,
+                    stdout=output,
+                    heartbeat_interval_sec=0.001) as c:
+                exit_code = c.send_command('com.martiansoftware.nailgun.examples.Heartbeat', ['10'])
+            self.assertEqual(exit_code, 0)
+
 
 class TestNailgunConnectionSmallHeartbeatTimeout(TestNailgunConnection):
 
