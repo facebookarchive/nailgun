@@ -44,9 +44,9 @@ else:
         return bytes(s, "utf-8")
 
 
-def str_to_bytes(string):
-    """Version independent way of converting strings to bytes."""
-    return string if is_py2 else string.encode("utf-8")
+def bytes_to_str(bytes_to_convert):
+    """Version independent way of converting bytes to string."""
+    return bytes_to_convert if is_py2 else bytes_to_convert.decode("utf-8")
 
 
 # @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
@@ -598,7 +598,7 @@ class NailgunConnection(object):
             bytes_to_read = min(len(self.buf), num_bytes - bytes_read)
             bytes_received = self.transport.recv_into(self.buf, bytes_to_read)
             if dest_file:
-                dest_file.write(str_to_bytes(self.buf[:bytes_received]))
+                dest_file.write(bytes_to_str(self.buf[:bytes_received]))
             bytes_read += bytes_received
 
     def _recv_to_buffer(self, num_bytes, buf):
