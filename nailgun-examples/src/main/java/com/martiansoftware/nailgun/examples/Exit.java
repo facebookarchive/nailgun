@@ -1,4 +1,4 @@
-/*   
+/*
 
 Copyright 2004-2012, Martian Software, Inc.
 
@@ -18,22 +18,20 @@ limitations under the License.
 
 package com.martiansoftware.nailgun.examples;
 
-/**
- * Finish nail with provided exit code
- */
+/** Finish nail with provided exit code */
 public class Exit {
 
-	public static void main (String[] args) {
-       	int exitCode = (int) ((Math.random() * 1000) + 1);
-       	if (args.length > 0) {
-	       	try {
-	       		exitCode = Integer.parseInt(args[0]);
-	       	} catch (Exception e) {}
-       	}
-		// Close stdout to test the exit code is returned properly
-		// even in such case
-		System.out.close();
-       	System.exit(exitCode);
+  public static void main(String[] args) {
+    int exitCode = (int) ((Math.random() * 1000) + 1);
+    if (args.length > 0) {
+      try {
+        exitCode = Integer.parseInt(args[0]);
+      } catch (Exception e) {
       }
-	
+    }
+    // Close stdout to test the exit code is returned properly
+    // even in such case
+    System.out.close();
+    System.exit(exitCode);
+  }
 }

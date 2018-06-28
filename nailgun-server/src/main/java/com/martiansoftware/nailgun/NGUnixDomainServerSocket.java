@@ -1,35 +1,33 @@
 /*
 
- Copyright 2004-2015, Martian Software, Inc.
+Copyright 2004-2015, Martian Software, Inc.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
- http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
- */
+*/
 package com.martiansoftware.nailgun;
 
+import com.sun.jna.LastErrorException;
+import com.sun.jna.ptr.IntByReference;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.sun.jna.LastErrorException;
-import com.sun.jna.ptr.IntByReference;
-
 /**
- * Implements a {@link ServerSocket} which binds to a local Unix domain socket
- * and returns instances of {@link NGUnixDomainSocket} from
- * {@link #accept()}.
+ * Implements a {@link ServerSocket} which binds to a local Unix domain socket and returns instances
+ * of {@link NGUnixDomainSocket} from {@link #accept()}.
  */
 public class NGUnixDomainServerSocket extends ServerSocket {
   private static final int DEFAULT_BACKLOG = 50;
@@ -72,38 +70,31 @@ public class NGUnixDomainServerSocket extends ServerSocket {
     }
   }
 
-  /**
-   * Constructs an unbound Unix domain server socket.
-   */
+  /** Constructs an unbound Unix domain server socket. */
   public NGUnixDomainServerSocket() throws IOException {
     this(DEFAULT_BACKLOG, null);
   }
 
-  /**
-   * Constructs an unbound Unix domain server socket with the specified listen backlog.
-   */
+  /** Constructs an unbound Unix domain server socket with the specified listen backlog. */
   public NGUnixDomainServerSocket(int backlog) throws IOException {
     this(backlog, null);
   }
 
-  /**
-   * Constructs and binds a Unix domain server socket to the specified path.
-   */
+  /** Constructs and binds a Unix domain server socket to the specified path. */
   public NGUnixDomainServerSocket(String path) throws IOException {
     this(DEFAULT_BACKLOG, path);
   }
 
   /**
-   * Constructs and binds a Unix domain server socket to the specified path
-   * with the specified listen backlog.
+   * Constructs and binds a Unix domain server socket to the specified path with the specified
+   * listen backlog.
    */
   public NGUnixDomainServerSocket(int backlog, String path) throws IOException {
     try {
-      fd = new AtomicInteger(
-          NGUnixDomainSocketLibrary.socket(
-              NGUnixDomainSocketLibrary.PF_LOCAL,
-              NGUnixDomainSocketLibrary.SOCK_STREAM,
-              0));
+      fd =
+          new AtomicInteger(
+              NGUnixDomainSocketLibrary.socket(
+                  NGUnixDomainSocketLibrary.PF_LOCAL, NGUnixDomainSocketLibrary.SOCK_STREAM, 0));
       this.backlog = backlog;
       if (path != null) {
         bind(new NGUnixDomainServerSocketAddress(path));
@@ -150,8 +141,7 @@ public class NGUnixDomainServerSocket extends ServerSocket {
       }
     }
     try {
-      NGUnixDomainSocketLibrary.SockaddrUn sockaddrUn =
-          new NGUnixDomainSocketLibrary.SockaddrUn();
+      NGUnixDomainSocketLibrary.SockaddrUn sockaddrUn = new NGUnixDomainSocketLibrary.SockaddrUn();
       IntByReference addressLen = new IntByReference();
       addressLen.setValue(sockaddrUn.size());
       int clientFd = NGUnixDomainSocketLibrary.accept(fd.get(), sockaddrUn, addressLen);

@@ -19,48 +19,42 @@ package com.martiansoftware.nailgun;
 import java.util.List;
 import java.util.Properties;
 
-/**
- * Provides all information required to run a nail command
- */
+/** Provides all information required to run a nail command */
 class CommandContext {
 
-	private final List<String> commandArguments;
-	private final Properties environmentVariables;
-	private final String workingDirectory;
-	private String command; // alias or class name
-	
-	CommandContext(String command, String workingDirectory, Properties environmentVariables, List<String> commandArguments) {
-		this.command = command;
-		this.workingDirectory = workingDirectory;
-		this.environmentVariables = environmentVariables;
-		this.commandArguments = commandArguments;
-	}
+  private final List<String> commandArguments;
+  private final Properties environmentVariables;
+  private final String workingDirectory;
+  private String command; // alias or class name
 
-	/**
-	 * @return arguments passed with command
-	 */
-	List<String> getCommandArguments() {
-		return commandArguments;
-	}
+  CommandContext(
+      String command,
+      String workingDirectory,
+      Properties environmentVariables,
+      List<String> commandArguments) {
+    this.command = command;
+    this.workingDirectory = workingDirectory;
+    this.environmentVariables = environmentVariables;
+    this.commandArguments = commandArguments;
+  }
 
-	/**
-	 * @return Environment variables that nailgun client is executed with
-	 */
-	Properties getEnvironmentVariables() {
-		return environmentVariables;
-	}
+  /** @return arguments passed with command */
+  List<String> getCommandArguments() {
+    return commandArguments;
+  }
 
-	/**
-	 * @return Working directory that nailgun client is executed in
-	 */
-	String getWorkingDirectory() {
-		return workingDirectory;
-	}
+  /** @return Environment variables that nailgun client is executed with */
+  Properties getEnvironmentVariables() {
+    return environmentVariables;
+  }
 
-	/**
-	 * @return Command name or alias to execute on Nailgun server, i.e. nail class name
-	 */
-	String getCommand() {
-		return command;
-	}
+  /** @return Working directory that nailgun client is executed in */
+  String getWorkingDirectory() {
+    return workingDirectory;
+  }
+
+  /** @return Command name or alias to execute on Nailgun server, i.e. nail class name */
+  String getCommand() {
+    return command;
+  }
 }

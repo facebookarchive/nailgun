@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Martian Software, Inc.
 
@@ -20,17 +20,17 @@ package com.martiansoftware.nailgun.examples;
 
 /**
  * Echos everything it reads from System.in to System.out.
- * 
+ *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class Echo {
 
-	public static void main(String[] args) throws Exception {
-		byte[] b = new byte[1024];
-		int bytesRead = System.in.read(b);
-		while (bytesRead != -1) {
-			System.out.write(b, 0, bytesRead);
-			bytesRead = System.in.read(b);
-		}
-	}
+  public static void main(String[] args) throws Exception {
+    byte[] b = new byte[1024];
+    int bytesRead = System.in.read(b);
+    while (bytesRead != -1) {
+      System.out.write(b, 0, bytesRead);
+      bytesRead = System.in.read(b);
+    }
+  }
 }

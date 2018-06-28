@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Martian Software, Inc.
 
@@ -27,61 +27,51 @@ import java.io.InputStream;
  */
 public class NGInputStream extends InputStream {
 
-    private final NGCommunicator communicator;
-    byte[] buf = new byte[1];
+  private final NGCommunicator communicator;
+  byte[] buf = new byte[1];
 
-    /**
-     * Creates a new NGInputStream over {@link NGCommunicator}
-     *
-     * @param communicator Lower level communicator which handles all reads from the socket
-     */
-    public NGInputStream(NGCommunicator communicator){
-        this.communicator = communicator;
-    }
+  /**
+   * Creates a new NGInputStream over {@link NGCommunicator}
+   *
+   * @param communicator Lower level communicator which handles all reads from the socket
+   */
+  public NGInputStream(NGCommunicator communicator) {
+    this.communicator = communicator;
+  }
 
-    /**
-     * @see java.io.InputStream#available()
-     */
-    @Override
-    public int available() throws IOException {
-        return communicator.available();
-    }
+  /** @see java.io.InputStream#available() */
+  @Override
+  public int available() throws IOException {
+    return communicator.available();
+  }
 
-    /**
-     * @see java.io.InputStream#markSupported()
-     */
-    @Override
-    public boolean markSupported() {
-        return false;
-    }
+  /** @see java.io.InputStream#markSupported() */
+  @Override
+  public boolean markSupported() {
+    return false;
+  }
 
-    /**
-     * @see java.io.InputStream#read()
-     */
-    public int read() throws IOException {
-        // have to synchronize all one byte reads to be able to reuse internal buffer and not
-        // recreate new buffer on heap each time
-        synchronized (buf) {
-            return read(buf, 0, 1) == -1 ? -1 : (int) buf[0];
-        }
+  /** @see java.io.InputStream#read() */
+  public int read() throws IOException {
+    // have to synchronize all one byte reads to be able to reuse internal buffer and not
+    // recreate new buffer on heap each time
+    synchronized (buf) {
+      return read(buf, 0, 1) == -1 ? -1 : (int) buf[0];
     }
+  }
 
-    /**
-     * @see java.io.InputStream#read(byte[])
-     */
-    public int read(byte[] b) throws IOException {
-        return read(b, 0, b.length);
-    }
+  /** @see java.io.InputStream#read(byte[]) */
+  public int read(byte[] b) throws IOException {
+    return read(b, 0, b.length);
+  }
 
-    /**
-     * @see java.io.InputStream#read(byte[], int, int)
-     */
-    public int read(byte[] b, int offset, int length) throws IOException {
-        try {
-            return communicator.receive(b, offset, length);
-        } catch (InterruptedException e) {
-            // return -1 which means no more data in Java stream world, if thread was terminated
-            return -1;
-        }
+  /** @see java.io.InputStream#read(byte[], int, int) */
+  public int read(byte[] b, int offset, int length) throws IOException {
+    try {
+      return communicator.receive(b, offset, length);
+    } catch (InterruptedException e) {
+      // return -1 which means no more data in Java stream world, if thread was terminated
+      return -1;
     }
+  }
 }

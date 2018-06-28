@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Jim Purbrick.
 
@@ -21,43 +21,43 @@ package com.martiansoftware.nailgun.examples;
 import com.martiansoftware.nailgun.NGContext;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Print H for each heartbeat received
- */
+/** Print H for each heartbeat received */
 public class Heartbeat {
 
-    public static void nailMain(final NGContext context) {
-        long runTimeout = Long.MAX_VALUE;
-        String[] args = context.getArgs();
-        if (args.length > 0) {
-            // first argument is the number of milliseconds to run a command
-            // if omitted it will never interrupt by itself
-            try {
-                runTimeout = Long.parseUnsignedLong(args[0]);
-            } catch (Exception e) {}
-        }
-
-        try {
-            Object lock = new Object();
-            AtomicBoolean shutdown = new AtomicBoolean(false);
-
-            context.addClientListener(reason -> {
-                synchronized (lock) {
-                    shutdown.set(true);
-                    lock.notifyAll();
-                }
-            });
-
-            context.addHeartbeatListener(() -> context.out.print("H"));
-
-            synchronized (lock) {
-                if (!shutdown.get()) {
-                    lock.wait(runTimeout);
-                }
-            }
-        } catch (InterruptedException ignored) {
-            System.exit(42);
-        }
-        System.exit(0);
+  public static void nailMain(final NGContext context) {
+    long runTimeout = Long.MAX_VALUE;
+    String[] args = context.getArgs();
+    if (args.length > 0) {
+      // first argument is the number of milliseconds to run a command
+      // if omitted it will never interrupt by itself
+      try {
+        runTimeout = Long.parseUnsignedLong(args[0]);
+      } catch (Exception e) {
+      }
     }
+
+    try {
+      Object lock = new Object();
+      AtomicBoolean shutdown = new AtomicBoolean(false);
+
+      context.addClientListener(
+          reason -> {
+            synchronized (lock) {
+              shutdown.set(true);
+              lock.notifyAll();
+            }
+          });
+
+      context.addHeartbeatListener(() -> context.out.print("H"));
+
+      synchronized (lock) {
+        if (!shutdown.get()) {
+          lock.wait(runTimeout);
+        }
+      }
+    } catch (InterruptedException ignored) {
+      System.exit(42);
+    }
+    System.exit(0);
+  }
 }

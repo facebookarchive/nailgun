@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Martian Software, Inc.
 
@@ -20,12 +20,12 @@ package com.martiansoftware.nailgun.examples;
 
 /**
  * A truly amazing program that must be seen to be believed.
- * 
+ *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class HelloWorld {
 
-	public static void main(String[] args) {
-		System.out.println("Hello, world!");
-	}
+  public static void main(String[] args) {
+    System.out.println("Hello, world!");
+  }
 }

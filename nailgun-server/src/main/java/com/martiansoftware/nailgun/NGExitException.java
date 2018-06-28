@@ -1,8 +1,8 @@
 /*
  * This class is based upon org.apache.tools.ant.ExitException and is
  * subject to the following:
- * 
- * 
+ *
+ *
  * The Apache Software License, Version 1.1
  *
  * Copyright (c) 2001-2003 The Apache Software Foundation.  All rights
@@ -66,41 +66,38 @@ import java.io.PrintStream;
  */
 public class NGExitException extends SecurityException {
 
-    /**
-     * Status code
-     */
-    private int status;
+  /** Status code */
+  private int status;
 
-    /**
-     * Constructs an exit exception.
-     *
-     * @param status the status code returned via System.exit()
-     */
-    public NGExitException(int status) {
-        super("ExitException: status " + status);
-        this.status = status;
-    }
+  /**
+   * Constructs an exit exception.
+   *
+   * @param status the status code returned via System.exit()
+   */
+  public NGExitException(int status) {
+    super("ExitException: status " + status);
+    this.status = status;
+  }
 
-    /**
-     * A lot of code out there, for example ant's Launcher, runs inside a
-     * try/catch (Throwable) which will squash this exception; most also calll
-     * printStackTrace(), so this re-throws the exception to escape the handling
-     * code.
-     */
-    public void printStackTrace(PrintStream out) {
-        throw this;
-    }
+  /**
+   * A lot of code out there, for example ant's Launcher, runs inside a try/catch (Throwable) which
+   * will squash this exception; most also calll printStackTrace(), so this re-throws the exception
+   * to escape the handling code.
+   */
+  public void printStackTrace(PrintStream out) {
+    throw this;
+  }
 
-    public void reallyPrintStackTrace(PrintStream out) {
-        super.printStackTrace(out);
-    }
+  public void reallyPrintStackTrace(PrintStream out) {
+    super.printStackTrace(out);
+  }
 
-    /**
-     * The status code returned by System.exit()
-     *
-     * @return the status code returned by System.exit()
-     */
-    public int getStatus() {
-        return status;
-    }
+  /**
+   * The status code returned by System.exit()
+   *
+   * @return the status code returned by System.exit()
+   */
+  public int getStatus() {
+    return status;
+  }
 }
