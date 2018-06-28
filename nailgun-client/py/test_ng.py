@@ -7,7 +7,7 @@ import shutil
 import uuid
 import sys
 
-from pynailgun import NailgunException, NailgunConnection
+from ng import NailgunException, NailgunConnection
 
 is_py2 = sys.version[0] == "2"
 if is_py2:
