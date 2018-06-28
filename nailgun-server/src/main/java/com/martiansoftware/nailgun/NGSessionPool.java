@@ -124,7 +124,7 @@ class NGSessionPool {
     for (NGSession session : allSessions) {
       long timeout =
           NGConstants.SESSION_TERMINATION_TIMEOUT_MILLIS
-              - TimeUnit.NANOSECONDS.convert(System.nanoTime() - start, TimeUnit.MILLISECONDS);
+              - TimeUnit.MILLISECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS);
       if (timeout < 1) {
         // Give all threads a chance to finish or pick up already finished threads
         timeout = 1;

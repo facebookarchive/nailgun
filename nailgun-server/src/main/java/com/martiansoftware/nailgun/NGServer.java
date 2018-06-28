@@ -330,7 +330,6 @@ public class NGServer implements Runnable {
 
   /** Listens for new connections and launches NGSession threads to process them. */
   public void run() {
-    running.set(true);
     NGSession sessionOnDeck = null;
 
     originalSecurityManager = System.getSecurityManager();
@@ -381,6 +380,8 @@ public class NGServer implements Runnable {
       } else {
         portDescription = "";
       }
+
+      running.set(true);
 
       // Only after this point nailgun server is ready to accept connections on all platforms.
       // test_ng.py on *nix relies on reading this line from stdout to start connecting to server.

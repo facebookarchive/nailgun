@@ -1,5 +1,7 @@
 package com.martiansoftware.nailgun;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.junit.jupiter.api.Test;
 
 class NGServerTest {
@@ -10,6 +12,7 @@ class NGServerTest {
     Thread t = new Thread(server);
     t.start();
     while (!server.isRunning()) {
+      assertTrue(t.isAlive());
       Thread.sleep(50);
     }
     server.shutdown(false);
