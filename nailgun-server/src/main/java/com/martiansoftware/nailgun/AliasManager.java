@@ -41,10 +41,8 @@ public class AliasManager {
     Properties props = new Properties();
     ClassLoader cl = getClass().getClassLoader();
     if (cl == null)
-      cl =
-          ClassLoader
-              .getSystemClassLoader(); // needed if nailgun classes are loaded in the boot
-                                       // classpath.
+      cl = ClassLoader.getSystemClassLoader(); // needed if nailgun classes are loaded in the boot
+    // classpath.
     try (InputStream is =
         cl.getResourceAsStream("com/martiansoftware/nailgun/builtins/builtins.properties")) {
       props.load(is);
