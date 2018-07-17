@@ -127,6 +127,9 @@ public class NGUnixDomainSocketLibrary {
 
   public static native int listen(int fd, int backlog) throws LastErrorException;
 
+  public static native int connect(int fd, SockaddrUn address, int addressLen)
+      throws LastErrorException;
+
   public static native int accept(int fd, SockaddrUn address, IntByReference addressLen)
       throws LastErrorException;
 
@@ -137,4 +140,6 @@ public class NGUnixDomainSocketLibrary {
   public static native int close(int fd) throws LastErrorException;
 
   public static native int shutdown(int fd, int how) throws LastErrorException;
+
+  public static native int unlink(String socketFile);
 }

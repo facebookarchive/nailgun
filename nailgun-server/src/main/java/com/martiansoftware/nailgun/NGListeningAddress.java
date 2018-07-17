@@ -17,6 +17,7 @@ limitations under the License.
 */
 package com.martiansoftware.nailgun;
 
+import com.sun.jna.Platform;
 import java.net.InetAddress;
 
 /** Represents the address on which the Nailgun server listens. */
@@ -98,5 +99,17 @@ public class NGListeningAddress {
     } else {
       return "local socket " + localAddress;
     }
+  }
+
+  /**
+   * Close any instances of local socket, i.e. Unix socket or Windows named pipe
+   *
+   * @param localAddress
+   */
+  public static void release(String localAddress) {
+    if (Platform.isWindows()) {
+      return;
+    }
+    NGUnixDomainSocketLibrary.unlink(localAddress);
   }
 }
