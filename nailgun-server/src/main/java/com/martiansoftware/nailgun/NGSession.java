@@ -17,6 +17,7 @@ limitations under the License.
 */
 package com.martiansoftware.nailgun;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
@@ -36,12 +37,19 @@ import java.util.logging.Logger;
  */
 public class NGSession extends Thread {
 
+  @FunctionalInterface
+  public interface CommnunicatorCreator {
+    NGCommunicator get(Socket socket) throws IOException;
+  }
+
   private static final Logger LOG = Logger.getLogger(NGSession.class.getName());
 
   /** The server this NGSession is working for */
   private final NGServer server;
   /** The pool this NGSession came from, and to which it will return itself */
   private final NGSessionPool sessionPool;
+  /** Factory method to provide NGCommunicator to operate on a socket */
+  private final CommnunicatorCreator communicatorCreator;
   /** Synchronization object */
   private final Object lock = new Object();
   /** The next socket this NGSession has been tasked with processing (by NGServer) */
@@ -87,11 +95,25 @@ public class NGSession extends Thread {
    * @param server The NGServer we're working for
    */
   NGSession(NGSessionPool sessionPool, NGServer server) {
+    this(sessionPool, server, null);
+  }
+
+  /**
+   * Creates a new NGSession running for the specified NGSessionPool and NGServer.
+   *
+   * @param sessionPool The NGSessionPool we're working for
+   * @param server The NGServer we're working for
+   */
+  NGSession(NGSessionPool sessionPool, NGServer server, CommnunicatorCreator communicatorCreator) {
     super();
     this.sessionPool = sessionPool;
     this.server = server;
     this.heartbeatTimeoutMillis = server.getHeartbeatTimeout();
     this.instanceNumber = instanceCounter.incrementAndGet();
+    this.communicatorCreator =
+        communicatorCreator != null
+            ? communicatorCreator
+            : (socket -> new NGCommunicator(socket, this.heartbeatTimeoutMillis));
   }
 
   /**
@@ -173,7 +195,7 @@ public class NGSession extends Thread {
     Socket socket = nextSocket();
     while (socket != null) {
       LOG.log(Level.FINE, "Client connected");
-      try (NGCommunicator comm = new NGCommunicator(socket, heartbeatTimeoutMillis)) {
+      try (NGCommunicator comm = communicatorCreator.get(socket)) {
 
         CommandContext cmdContext = comm.readCommandContext();
 
@@ -191,9 +213,11 @@ public class NGSession extends Thread {
             PrintStream err =
                 new PrintStream(new NGOutputStream(comm, NGConstants.CHUNKTYPE_STDERR)); ) {
           // ThreadLocal streams for System.in/out/err redirection
-          ((ThreadLocalInputStream) System.in).init(in);
-          ((ThreadLocalPrintStream) System.out).init(out);
-          ((ThreadLocalPrintStream) System.err).init(err);
+          if (System.in instanceof ThreadLocalInputStream) {
+            ((ThreadLocalInputStream) System.in).init(in);
+            ((ThreadLocalPrintStream) System.out).init(out);
+            ((ThreadLocalPrintStream) System.err).init(err);
+          }
 
           try {
             Alias alias = server.getAliasManager().getAlias(cmdContext.getCommand());
@@ -288,9 +312,11 @@ public class NGSession extends Thread {
         t.printStackTrace();
       }
 
-      ((ThreadLocalInputStream) System.in).init(null);
-      ((ThreadLocalPrintStream) System.out).init(null);
-      ((ThreadLocalPrintStream) System.err).init(null);
+      if (System.in instanceof ThreadLocalInputStream) {
+        ((ThreadLocalInputStream) System.in).init(null);
+        ((ThreadLocalPrintStream) System.out).init(null);
+        ((ThreadLocalPrintStream) System.err).init(null);
+      }
 
       updateThreadName(null);
       sessionPool.give(this);
