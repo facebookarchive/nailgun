@@ -18,8 +18,13 @@
 
 package com.martiansoftware.nailgun;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -36,10 +41,13 @@ class NGSessionPool {
   final Queue<NGSession> idlePool;
   final Set<NGSession> workingPool;
 
-  int maxIdleSessions;
+  final int maxIdleSessions;
 
   /** reference to server we're working for */
   final NGServer server;
+
+  /** factory to create new NGSession instances */
+  final Supplier<NGSession> instanceCreator;
 
   /** have we been shut down? */
   boolean done = false;
@@ -55,11 +63,25 @@ class NGSessionPool {
    * @param maxIdleSessions the maximum number of idle threads to allow
    */
   NGSessionPool(NGServer server, int maxIdleSessions) {
+    this(server, maxIdleSessions, null);
+  }
+
+  /**
+   * Creates a new NGSessionRunner operating for the specified server, with the specified number of
+   * threads
+   *
+   * @param server the server to work for
+   * @param maxIdleSessions the maximum number of idle threads to allow
+   * @param instanceCreator the factory method to create new NGSession instances, can be overridden
+   *     for testing
+   */
+  NGSessionPool(NGServer server, int maxIdleSessions, Supplier<NGSession> instanceCreator) {
     this.server = server;
     this.maxIdleSessions = Math.max(0, maxIdleSessions);
-
     idlePool = new LinkedList<>();
     workingPool = new HashSet<>();
+    this.instanceCreator =
+        instanceCreator != null ? instanceCreator : (() -> new NGSession(this, server));
   }
 
   /**
@@ -74,7 +96,7 @@ class NGSessionPool {
       }
       NGSession session = idlePool.poll();
       if (session == null) {
-        session = new NGSession(this, server);
+        session = instanceCreator.get();
         session.start();
       }
       workingPool.add(session);
