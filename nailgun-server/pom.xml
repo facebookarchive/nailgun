@@ -91,6 +91,14 @@
               <groupId>org.apache.maven.plugins</groupId>
               <artifactId>maven-surefire-plugin</artifactId>
               <version>2.22.0</version>
+              <configuration>
+                <systemProperties>
+                  <property>
+                    <name>nailgun.server.version</name>
+                    <value>${project.version}</value>
+                  </property>
+                </systemProperties>
+             </configuration>
               <dependencies>
                 <dependency>
                   <groupId>org.junit.platform</groupId>
