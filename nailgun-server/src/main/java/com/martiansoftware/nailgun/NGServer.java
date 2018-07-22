@@ -66,7 +66,7 @@ public class NGServer implements Runnable {
   private boolean allowNailsByClassName = true;
 
   /** The default class to use if an invalid alias or classname is specified by the client. */
-  private Class defaultNailClass = null;
+  private Class defaultNailClass = DefaultNail.class;
 
   /** A pool of NGSessions ready to handle client connections */
   private final NGSessionPool sessionPool;
@@ -167,7 +167,7 @@ public class NGServer implements Runnable {
    * @return a flag that indicates whether Nail lookups by classname are allowed.
    */
   public boolean allowsNailsByClassName() {
-    return (allowNailsByClassName);
+    return allowNailsByClassName;
   }
 
   /**
@@ -179,6 +179,9 @@ public class NGServer implements Runnable {
    *     default)
    */
   public void setDefaultNailClass(Class defaultNailClass) {
+    if (defaultNailClass == null) {
+      throw new IllegalArgumentException("defaultNailClass");
+    }
     this.defaultNailClass = defaultNailClass;
   }
 
@@ -188,7 +191,7 @@ public class NGServer implements Runnable {
    * @return the default class that will be used if no Nails can be found via alias or classname.
    */
   public Class getDefaultNailClass() {
-    return ((defaultNailClass == null) ? DefaultNail.class : defaultNailClass);
+    return defaultNailClass;
   }
 
   /**
@@ -254,7 +257,7 @@ public class NGServer implements Runnable {
    * @return the AliasManager in use by this NGServer.
    */
   public AliasManager getAliasManager() {
-    return (aliasManager);
+    return aliasManager;
   }
 
   /**
@@ -325,7 +328,7 @@ public class NGServer implements Runnable {
    * @return the port on which this server is (or will be) listening.
    */
   public int getPort() {
-    return ((serversocket == null) ? listeningAddress.getInetPort() : serversocket.getLocalPort());
+    return (serversocket == null) ? listeningAddress.getInetPort() : serversocket.getLocalPort();
   }
 
   /** Listens for new connections and launches NGSession threads to process them. */
