@@ -102,7 +102,7 @@ public class NGListeningAddress {
   }
 
   /**
-   * Close any instances of local socket, i.e. Unix socket or Windows named pipe
+   * Close any instances of local socket, i.e. Unix socket; noop on Windows
    *
    * @param localAddress
    */
