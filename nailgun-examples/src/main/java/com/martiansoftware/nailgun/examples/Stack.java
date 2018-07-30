@@ -51,15 +51,16 @@ public class Stack {
   public static void nailMain(NGContext context) throws InterruptedException {
     if (context.getCommand().equals("push")) {
       synchronized (sharedStack) {
-        String[] args = context.getArgs();
-        for (int i = 0; i < args.length; ++i) {
-          sharedStack.push(args[i]);
+        for (String arg: context.getArgs()) {
+          sharedStack.push(arg);
         }
         sharedStack.notifyAll();
         context.exit(0);
         return;
       }
-    } else if (context.getCommand().equals("pop")) {
+    }
+
+    if (context.getCommand().equals("pop")) {
       int exitCode = 1;
       synchronized (sharedStack) {
         while (!done && (sharedStack.size() == 0)) {

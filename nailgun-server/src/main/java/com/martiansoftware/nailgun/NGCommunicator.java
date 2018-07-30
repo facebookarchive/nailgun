@@ -16,12 +16,29 @@
 
 package com.martiansoftware.nailgun;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.Closeable;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -194,7 +211,10 @@ public class NGCommunicator implements Closeable {
                         });
               }
 
-              byte chunkType = readFuture.get(futureTimeout, TimeUnit.MILLISECONDS);
+              byte chunkType =
+                  futureTimeout > 0
+                      ? readFuture.get(futureTimeout, TimeUnit.MILLISECONDS)
+                      : readFuture.get();
 
               if (chunkType == NGConstants.CHUNKTYPE_HEARTBEAT) {
                 notifyHeartbeat();

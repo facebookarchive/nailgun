@@ -19,7 +19,6 @@
 package com.martiansoftware.nailgun.examples;
 
 import com.martiansoftware.nailgun.NGContext;
-import java.util.Iterator;
 import java.util.TreeSet;
 
 /**
@@ -45,8 +44,8 @@ public class DumpAll {
 
     context.out.println("\ncontext.getEnv():");
     TreeSet keys = new TreeSet(context.getEnv().keySet());
-    for (Iterator i = keys.iterator(); i.hasNext(); ) {
-      String key = (String) i.next();
+    for (Object okey : keys) {
+      String key = (String) okey;
       context.out.println("   env[\"" + key + "\"]=" + context.getEnv().getProperty(key));
     }
   }

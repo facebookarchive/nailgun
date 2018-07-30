@@ -22,8 +22,8 @@ import com.martiansoftware.nailgun.NGContext;
 import java.security.MessageDigest;
 import java.security.Provider;
 import java.security.Security;
-import java.util.Iterator;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Hashes the client's stdin to the client's stdout in the form of a hexadecimal string. Command
@@ -36,7 +36,7 @@ public class Hash {
 
   // used to turn byte[] to string
   private static final char[] HEXCHARS = {
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
   };
 
   /**
@@ -49,15 +49,15 @@ public class Hash {
    * @param serviceType The name of the service we're looking for. It's "MessageDigest"
    */
   private static Set getCryptoImpls(String serviceType) {
-    Set result = new java.util.TreeSet();
+    Set result = new TreeSet();
 
     // All all providers
     Provider[] providers = Security.getProviders();
     for (int i = 0; i < providers.length; i++) {
       // Get services provided by each provider
       Set keys = providers[i].keySet();
-      for (Iterator it = keys.iterator(); it.hasNext(); ) {
-        String key = (String) it.next();
+      for (Object okey : providers[i].keySet()) {
+        String key = (String) okey;
         key = key.split(" ")[0];
 
         if (key.startsWith(serviceType + ".")) {
@@ -68,7 +68,7 @@ public class Hash {
         }
       }
     }
-    return (result);
+    return result;
   }
 
   /**
@@ -83,28 +83,29 @@ public class Hash {
     if (args.length == 0) {
       // display available algorithms
       Set algs = getCryptoImpls("MessageDigest");
-      for (Iterator i = algs.iterator(); i.hasNext(); ) {
-        context.out.println(i.next());
+      for (Object alg : algs) {
+        context.out.println(alg);
       }
-    } else {
-      // perform the actual hash.  throw any exceptions back to the user.
-      MessageDigest md = MessageDigest.getInstance(args[0]);
-
-      byte[] b = new byte[1024];
-      int bytesRead = context.in.read(b);
-      while (bytesRead != -1) {
-        md.update(b, 0, bytesRead);
-        bytesRead = System.in.read(b);
-      }
-      byte[] result = md.digest();
-
-      // convert hash result to a string of hex characters and print it to the client.
-      StringBuffer buf = new StringBuffer();
-      for (int i = 0; i < result.length; ++i) {
-        buf.append(HEXCHARS[(result[i] >> 4) & 0x0f]);
-        buf.append(HEXCHARS[result[i] & 0x0f]);
-      }
-      context.out.println(buf);
+      return;
     }
+
+    // perform the actual hash.  throw any exceptions back to the user.
+    MessageDigest md = MessageDigest.getInstance(args[0]);
+
+    byte[] b = new byte[1024];
+    int bytesRead = context.in.read(b);
+    while (bytesRead != -1) {
+      md.update(b, 0, bytesRead);
+      bytesRead = System.in.read(b);
+    }
+    byte[] result = md.digest();
+
+    // convert hash result to a string of hex characters and print it to the client.
+    StringBuffer buf = new StringBuffer();
+    for (int i = 0; i < result.length; ++i) {
+      buf.append(HEXCHARS[(result[i] >> 4) & 0x0f]);
+      buf.append(HEXCHARS[result[i] & 0x0f]);
+    }
+    context.out.println(buf);
   }
 }
