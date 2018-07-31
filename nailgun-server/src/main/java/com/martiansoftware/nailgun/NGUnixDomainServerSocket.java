@@ -18,6 +18,7 @@ limitations under the License.
 package com.martiansoftware.nailgun;
 
 import com.sun.jna.LastErrorException;
+import com.sun.jna.Platform;
 import com.sun.jna.ptr.IntByReference;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -156,8 +157,19 @@ public class NGUnixDomainServerSocket extends ServerSocket {
       throw new IllegalStateException("Socket is already closed");
     }
     try {
-      // Ensure any pending call to accept() fails.
-      NGUnixDomainSocketLibrary.close(fd.getAndSet(-1));
+      // Close listening socket to unblock a thread calling 'accept()'
+      int socketFd = fd.getAndSet(-1);
+
+      // Mac and Linux have different behavior. On Mac, calling 'close()' on socket descriptor
+      // will cause `accept()` to throw and unblock (allowing us to finish gracefully), while on
+      // Linux it remains blocked. To unblock listening socket on Linux we have to call `shutdown()`
+      // first, but on Mac it fails with 'Socket not connected' exception. So we only call shutdown
+      // on Linux.
+      if (Platform.isLinux()) {
+        NGUnixDomainSocketLibrary.shutdown(socketFd, NGUnixDomainSocketLibrary.SHUT_RDWR);
+      }
+
+      NGUnixDomainSocketLibrary.close(socketFd);
       isClosed = true;
     } catch (LastErrorException e) {
       throw new IOException(e);

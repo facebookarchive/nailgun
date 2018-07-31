@@ -36,6 +36,7 @@ public class NGUnixDomainSocketLibrary {
 
   public static final int SHUT_RD = 0;
   public static final int SHUT_WR = 1;
+  public static final int SHUT_RDWR = 2;
 
   // Utility class, do not instantiate.
   private NGUnixDomainSocketLibrary() {}

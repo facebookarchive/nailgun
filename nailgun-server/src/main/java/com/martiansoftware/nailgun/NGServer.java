@@ -244,7 +244,7 @@ public class NGServer implements Runnable {
   public Map<String, NailStats> getNailStats() {
     Map<String, NailStats> result = new TreeMap();
     synchronized (allNailStats) {
-      for (Map.Entry<String, NailStats> entry : result.entrySet()) {
+      for (Map.Entry<String, NailStats> entry : allNailStats.entrySet()) {
         result.put(entry.getKey(), (NailStats) entry.getValue().clone());
       }
     }
@@ -334,16 +334,17 @@ public class NGServer implements Runnable {
   /** Listens for new connections and launches NGSession threads to process them. */
   public void run() {
     NGSession sessionOnDeck = null;
-
     originalSecurityManager = System.getSecurityManager();
     System.setSecurityManager(new NGSecurityManager(originalSecurityManager));
 
-    synchronized (System.in) {
-      if (!(System.in instanceof ThreadLocalInputStream)) {
-        System.setIn(new ThreadLocalInputStream(in));
-        System.setOut(new ThreadLocalPrintStream(out));
-        System.setErr(new ThreadLocalPrintStream(err));
-      }
+    if (!(System.in instanceof ThreadLocalInputStream)) {
+      System.setIn(new ThreadLocalInputStream(in));
+    }
+    if (!(System.out instanceof ThreadLocalPrintStream)) {
+      System.setOut(new ThreadLocalPrintStream(out));
+    }
+    if (!(System.err instanceof ThreadLocalPrintStream)) {
+      System.setErr(new ThreadLocalPrintStream(err));
     }
 
     try {
@@ -383,7 +384,6 @@ public class NGServer implements Runnable {
       } else {
         portDescription = "";
       }
-
       running.set(true);
 
       // Only after this point nailgun server is ready to accept connections on all platforms.
@@ -401,7 +401,6 @@ public class NGServer implements Runnable {
         Socket socket = serversocket.accept();
         sessionOnDeck.run(socket);
       }
-
     } catch (Throwable t) {
       // if shutdown is called while the accept() method is blocking,
       // an exception will be thrown that we don't care about.  filter
