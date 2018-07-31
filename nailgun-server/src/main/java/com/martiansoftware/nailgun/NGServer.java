@@ -25,8 +25,9 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.util.Iterator;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -142,7 +143,7 @@ public class NGServer implements Runnable {
     this.listeningAddress = listeningAddress;
 
     aliasManager = new AliasManager();
-    allNailStats = new java.util.HashMap();
+    allNailStats = new HashMap();
     // allow a maximum of 10 idle threads.  probably too high a number
     // and definitely should be configurable in the future
     sessionPool = new NGSessionPool(this, sessionPoolSize);
@@ -241,11 +242,10 @@ public class NGServer implements Runnable {
    * @return a snapshot of this NGServer's nail statistics.
    */
   public Map<String, NailStats> getNailStats() {
-    Map<String, NailStats> result = new java.util.TreeMap();
+    Map<String, NailStats> result = new TreeMap();
     synchronized (allNailStats) {
-      for (Iterator i = allNailStats.keySet().iterator(); i.hasNext(); ) {
-        String nailclass = (String) i.next();
-        result.put(nailclass, (NailStats) (allNailStats.get(nailclass)).clone());
+      for (Map.Entry<String, NailStats> entry : result.entrySet()) {
+        result.put(entry.getKey(), (NailStats) entry.getValue().clone());
       }
     }
     return result;
