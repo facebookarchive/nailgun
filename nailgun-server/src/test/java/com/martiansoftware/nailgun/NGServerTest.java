@@ -45,7 +45,7 @@ class NGServerTest {
 
   @AfterEach
   private void stopServer() throws InterruptedException {
-    context.server.shutdown(false);
+    context.server.shutdown();
     context.thread.join();
     NGListeningAddress.release(SOCKET_ADDR);
   }

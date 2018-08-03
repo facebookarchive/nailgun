@@ -19,6 +19,7 @@ package com.martiansoftware.nailgun;
 
 import com.martiansoftware.nailgun.builtins.DefaultNail;
 import com.sun.jna.Platform;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.InetAddress;
@@ -266,7 +267,7 @@ public class NGServer implements Runnable {
    * will happen later
    */
   public void signalExit() {
-    ForkJoinPool.commonPool().submit(() -> shutdown(true));
+    ForkJoinPool.commonPool().submit(() -> shutdown());
   }
 
   /**
@@ -278,38 +279,18 @@ public class NGServer implements Runnable {
    * <pre><code>public static void nailShutdown(NGServer)</code></pre>
    *
    * method will have this method called with this NGServer as its sole parameter.
-   *
-   * @param exitVM if true, this method will also exit the JVM after calling nailShutdown() on any
-   *     nails.
    */
-  public void shutdown(boolean exitVM) {
+  public void shutdown() {
     if (shutdown.getAndSet(true)) {
       return;
     }
 
+    // NGServer main thread might be blocking on socket in `accept()`, so we close the socket
+    // here to unblock it and finish gracefully
     try {
       serversocket.close();
     } catch (Throwable ex) {
       LOG.log(Level.WARNING, "Exception closing server socket on Nailgun server shutdown", ex);
-    }
-
-    // close all idle sessions and wait for all running sessions to complete
-    try {
-      sessionPool.shutdown();
-    } catch (Throwable ex) {
-      // we are going to die anyways so let's just continue
-      LOG.log(Level.WARNING, "Exception shutting down Nailgun server", ex);
-    }
-
-    // restore system streams
-    System.setIn(in);
-    System.setOut(out);
-    System.setErr(err);
-
-    System.setSecurityManager(originalSecurityManager);
-
-    if (exitVM) {
-      System.exit(0);
     }
   }
 
@@ -333,7 +314,6 @@ public class NGServer implements Runnable {
 
   /** Listens for new connections and launches NGSession threads to process them. */
   public void run() {
-    NGSession sessionOnDeck = null;
     originalSecurityManager = System.getSecurityManager();
     System.setSecurityManager(new NGSecurityManager(originalSecurityManager));
 
@@ -384,6 +364,8 @@ public class NGServer implements Runnable {
       } else {
         portDescription = "";
       }
+
+      // at this moment server is capable to accept connections
       running.set(true);
 
       // Only after this point nailgun server is ready to accept connections on all platforms.
@@ -397,21 +379,38 @@ public class NGServer implements Runnable {
               + ".");
 
       while (!shutdown.get()) {
-        sessionOnDeck = sessionPool.take();
+        // this call blocks until a new connection is available, or socket is closed and
+        // IOException is thrown
         Socket socket = serversocket.accept();
-        sessionOnDeck.run(socket);
+
+        // get a session and run nail on it
+        // the session is responsible to return itself to the pool
+        // TBD: should we reconsider this?
+        sessionPool.take().run(socket);
       }
-    } catch (Throwable t) {
-      // if shutdown is called while the accept() method is blocking,
-      // an exception will be thrown that we don't care about.  filter
-      // those out.
+    } catch (IOException ex) {
+      // If shutdown is called while the accept() method is blocking, it wil throw IOException
+      // Do not propagate it if we are in shutdown mode
       if (!shutdown.get()) {
-        t.printStackTrace();
+        throw new RuntimeException(ex);
       }
     }
-    if (sessionOnDeck != null) {
-      sessionOnDeck.shutdown();
+
+    // close all idle sessions and wait for all running sessions to complete
+    try {
+      sessionPool.shutdown();
+    } catch (Throwable ex) {
+      // we are going to die anyways so let's just continue
+      LOG.log(Level.WARNING, "Exception shutting down Nailgun server", ex);
     }
+
+    // restore system streams
+    System.setIn(in);
+    System.setOut(out);
+    System.setErr(err);
+
+    System.setSecurityManager(originalSecurityManager);
+
     running.set(false);
   }
 
@@ -502,7 +501,7 @@ public class NGServer implements Runnable {
    */
   private static class NGServerShutdowner extends Thread {
 
-    private NGServer server = null;
+    private final NGServer server;
 
     NGServerShutdowner(NGServer server) {
       this.server = server;
@@ -511,7 +510,7 @@ public class NGServer implements Runnable {
     public void run() {
 
       int count = 0;
-      server.shutdown(false);
+      server.shutdown();
 
       // give the server up to five seconds to stop.  is that enough?
       // remember that the shutdown will call nailShutdown in any
