@@ -3,6 +3,7 @@ package com.martiansoftware.nailgun;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
@@ -56,9 +57,18 @@ class NGCommunicatorTest {
     ByteArrayInputStream istream = new ByteArrayInputStream(payload);
     when(socket.getInputStream()).thenReturn(istream);
 
-    // ByteArrayInputStream is = new ByteArrayInputStream()
     NGCommunicator comm = new NGCommunicator(socket, 0);
     CommandContext context = comm.readCommandContext();
     assertEquals(command, context.getCommand());
+  }
+
+  @Test
+  void canWriteData() throws IOException {
+    NGCommunicator comm = new NGCommunicator(socket, 0);
+
+    byte[] data = {0x01, 0x02, 0x03};
+    comm.send(NGConstants.CHUNKTYPE_STDOUT, data, 0, data.length);
+
+    verify(ostream).write(data, 0, data.length);
   }
 }
