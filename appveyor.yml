@@ -21,4 +21,4 @@ build_script:
   - "mvn package"
 
 test_script:
-  - "python -m nailgun-client.py.test_ng"
+  - "python nailgun-client/py/test_ng.py"
