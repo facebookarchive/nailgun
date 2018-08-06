@@ -97,6 +97,10 @@
                     <name>nailgun.server.version</name>
                     <value>${project.version}</value>
                   </property>
+                  <property>
+                    <name>jna.nosys</name>
+                    <value>true</value>
+                  </property>
                 </systemProperties>
              </configuration>
               <dependencies>
