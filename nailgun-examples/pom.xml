@@ -28,7 +28,7 @@
         <dependency>
             <groupId>com.martiansoftware</groupId>
             <artifactId>nailgun-server</artifactId>
-            <version>${version}</version>
+            <version>${project.version}</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>
