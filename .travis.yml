@@ -1,4 +1,9 @@
 language: python
+
+os:
+  - linux
+  - osx
+
 addons:
   apt:
     packages:
