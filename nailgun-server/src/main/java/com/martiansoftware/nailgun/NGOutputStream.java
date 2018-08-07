@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Martian Software, Inc.
 
@@ -28,45 +28,39 @@ import java.io.OutputStream;
  */
 class NGOutputStream extends OutputStream {
 
-    private final byte streamCode;
-    private final NGCommunicator communicator;
-    byte[] buf = new byte[1];
+  private final byte streamCode;
+  private final NGCommunicator communicator;
+  byte[] buf = new byte[1];
 
-    /**
-     * Creates a new NGOutputStream over {@link NGCommunicator} using the specified NailGun chunk
-     * code.
-     *
-     * @param communicator Lower level communicator which handles all writes to the socket
-     * @param streamCode the NailGun chunk code associated with this stream (i.e., '1' for stdout,
-     * '2' for stderr).
-     */
-    public NGOutputStream(NGCommunicator communicator, byte streamCode) {
-        this.streamCode = streamCode;
-        this.communicator = communicator;
-    }
+  /**
+   * Creates a new NGOutputStream over {@link NGCommunicator} using the specified NailGun chunk
+   * code.
+   *
+   * @param communicator Lower level communicator which handles all writes to the socket
+   * @param streamCode the NailGun chunk code associated with this stream (i.e., '1' for stdout, '2'
+   *     for stderr).
+   */
+  public NGOutputStream(NGCommunicator communicator, byte streamCode) {
+    this.streamCode = streamCode;
+    this.communicator = communicator;
+  }
 
-    /**
-     * @see java.io.OutputStream#write(byte[])
-     */
-    @Override
-    public void write(byte[] b) throws IOException {
-        write(b, 0, b.length);
-    }
+  /** @see java.io.OutputStream#write(byte[]) */
+  @Override
+  public void write(byte[] b) throws IOException {
+    write(b, 0, b.length);
+  }
 
-    /**
-     * @see java.io.OutputStream#write(int)
-     */
-    @Override
-    public void write(int b) throws IOException {
-        buf[0] = (byte) b;
-        write(buf, 0, 1);
-    }
+  /** @see java.io.OutputStream#write(int) */
+  @Override
+  public void write(int b) throws IOException {
+    buf[0] = (byte) b;
+    write(buf, 0, 1);
+  }
 
-    /**
-     * @see java.io.OutputStream#write(byte[], int, int)
-     */
-    @Override
-    public void write(byte[] b, int offset, int len) throws IOException {
-        communicator.send(streamCode, b, offset, len);
-    }
+  /** @see java.io.OutputStream#write(byte[], int, int) */
+  @Override
+  public void write(byte[] b, int offset, int len) throws IOException {
+    communicator.send(streamCode, b, offset, len);
+  }
 }

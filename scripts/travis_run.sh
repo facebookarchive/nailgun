@@ -5,4 +5,4 @@ mvn package
 
 export PYTHONPATH=.
 python --version
-python pynailgun/test_ng.py
+python nailgun-client/py/test_ng.py

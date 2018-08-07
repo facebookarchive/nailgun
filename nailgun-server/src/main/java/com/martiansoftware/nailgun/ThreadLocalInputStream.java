@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Martian Software, Inc.
 
@@ -22,123 +22,103 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * The class name is pretty descriptive.  This creates an InputStream
- * much like a FilterInputStream, but with the wrapped InputStream
- * being local to the current Thread.  By setting System.in to a
- * ThreadLocalInputStream, different Threads can read from different
- * InputStreams simply by using System.in.  Of course, the init()
- * method must be called by the Thread that wishes to use the 
+ * The class name is pretty descriptive. This creates an InputStream much like a FilterInputStream,
+ * but with the wrapped InputStream being local to the current Thread. By setting System.in to a
+ * ThreadLocalInputStream, different Threads can read from different InputStreams simply by using
+ * System.in. Of course, the init() method must be called by the Thread that wishes to use the
  * wrapped stream.
- *  
+ *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 class ThreadLocalInputStream extends InputStream {
 
-    /**
-     * The InputStreams for the various threads
-     */
-    private InheritableThreadLocal streams = null;
+  /** The InputStreams for the various threads */
+  private InheritableThreadLocal streams = null;
 
-    private InputStream defaultInputStream = null;
-    
-    /**
-     * @param defaultInputStream the InputStream that will be used if the
-     * current thread has not called init()
-     */
-    ThreadLocalInputStream(InputStream defaultInputStream) {
-        super();
-        streams = new InheritableThreadLocal();
-        this.defaultInputStream = defaultInputStream;
-        init(null);
-    }
+  private InputStream defaultInputStream = null;
 
-    /**
-     * Sets the InputStream for the current thread
-     * @param streamForCurrentThread the InputStream for the current thread
-     */
-    void init(InputStream streamForCurrentThread) {
-        streams.set(streamForCurrentThread);
-    }
+  /**
+   * @param defaultInputStream the InputStream that will be used if the current thread has not
+   *     called init()
+   */
+  ThreadLocalInputStream(InputStream defaultInputStream) {
+    super();
+    streams = new InheritableThreadLocal();
+    this.defaultInputStream = defaultInputStream;
+    init(null);
+  }
 
-    /**
-     * Returns this thread's InputStream
-     * @return this thread's InputStream
-     */
-    InputStream getInputStream() {
-    	InputStream result = (InputStream) streams.get();
-    	return ((result == null) ? defaultInputStream : result);
-    }
+  /**
+   * Sets the InputStream for the current thread
+   *
+   * @param streamForCurrentThread the InputStream for the current thread
+   */
+  void init(InputStream streamForCurrentThread) {
+    streams.set(streamForCurrentThread);
+  }
 
-//  BEGIN delegated java.io.InputStream methods
+  /**
+   * Returns this thread's InputStream
+   *
+   * @return this thread's InputStream
+   */
+  InputStream getInputStream() {
+    InputStream result = (InputStream) streams.get();
+    return ((result == null) ? defaultInputStream : result);
+  }
 
-    /**
-     * @see java.io.InputStream#available()
-     */
-    public int available() throws IOException {
-        return (getInputStream().available());
-    }
+  //  BEGIN delegated java.io.InputStream methods
 
-    /**
-     * @see java.io.InputStream#close()
-     */
-    public void close() throws IOException {
-        getInputStream().close();
-    }
+  /** @see java.io.InputStream#available() */
+  public int available() throws IOException {
+    return (getInputStream().available());
+  }
 
-    /**
-     * @see java.io.InputStream#mark(int)
-     */
-    public void mark(int readlimit) {
-        getInputStream().mark(readlimit);
-    }
+  /** @see java.io.InputStream#close() */
+  public void close() throws IOException {
+    getInputStream().close();
+  }
 
-    /**
-     * @see java.io.InputStream#markSupported()
-     */
-    public boolean markSupported() {
-        return (getInputStream().markSupported());
-    }
+  /** @see java.io.InputStream#mark(int) */
+  public void mark(int readlimit) {
+    getInputStream().mark(readlimit);
+  }
 
-    /**
-     * @see java.io.InputStream#read()
-     */
-    public int read() throws IOException {
-        return (getInputStream().read());
-    }
+  /** @see java.io.InputStream#markSupported() */
+  public boolean markSupported() {
+    return (getInputStream().markSupported());
+  }
 
-    /**
-     * @see java.io.InputStream#read(byte[])
-     */
-    public int read(byte[] b) throws IOException {
-        return (getInputStream().read(b));
-    }
+  /** @see java.io.InputStream#read() */
+  public int read() throws IOException {
+    return (getInputStream().read());
+  }
 
-    /**
-     * @see java.io.InputStream#read(byte[],int,int)
-     */
-    public int read(byte[] b, int off, int len) throws IOException {
-        return (getInputStream().read(b, off, len));
-    }
+  /** @see java.io.InputStream#read(byte[]) */
+  public int read(byte[] b) throws IOException {
+    return (getInputStream().read(b));
+  }
 
-    /**
-     * @see java.io.InputStream#reset()
-     */
-    public void reset() throws IOException {
-        getInputStream().reset();
-    }
+  /** @see java.io.InputStream#read(byte[],int,int) */
+  public int read(byte[] b, int off, int len) throws IOException {
+    return (getInputStream().read(b, off, len));
+  }
 
-    /**
-     * @see java.io.InputStream#skip(long)
-     */
-    public long skip(long n) throws IOException {
-        return (getInputStream().skip(n));
-    }
+  /** @see java.io.InputStream#reset() */
+  public void reset() throws IOException {
+    getInputStream().reset();
+  }
 
-//  BEGIN delegated java.io.InputStream methods
+  /** @see java.io.InputStream#skip(long) */
+  public long skip(long n) throws IOException {
+    return (getInputStream().skip(n));
+  }
 
-//  Note: Should java.lang.Object methods be delegated? If not, and
-//  someone synchronizes on this stream, processes might be blocked
-//  that shouldn't be.  It would certainly be stupid to delegate
-//  finalize().  Not so clear are hashcode(), equals(), notify(), and
-//  the wait() methods.
+  //  BEGIN delegated java.io.InputStream methods
+
+  //  Note: Should java.lang.Object methods be delegated? If not, and
+  //  someone synchronizes on this stream, processes might be blocked
+  //  that shouldn't be.  It would certainly be stupid to delegate
+  //  finalize().  Not so clear are hashcode(), equals(), notify(), and
+  //  the wait() methods.
 }

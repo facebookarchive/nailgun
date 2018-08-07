@@ -1,4 +1,4 @@
-/*   
+/*
 
 Copyright 2004-2012, Martian Software, Inc.
 
@@ -20,53 +20,48 @@ package com.martiansoftware.nailgun;
 
 import java.security.Permission;
 
-import java.io.PrintStream;
-
 /**
- * Security manager which does nothing other than trap
- * checkExit, or delegate all non-deprecated methods to
- * a base manager.
+ * Security manager which does nothing other than trap checkExit, or delegate all non-deprecated
+ * methods to a base manager.
  *
  * @author Pete Kirkham
  */
 public class NGSecurityManager extends SecurityManager {
-    final SecurityManager base;
+  final SecurityManager base;
 
-    /**
-     * Construct an NGSecurityManager with the given base.
-     *
-     * @param base the base security manager, or null for no base.
-     */
-    public NGSecurityManager(SecurityManager base) {
-        this.base = base;
+  /**
+   * Construct an NGSecurityManager with the given base.
+   *
+   * @param base the base security manager, or null for no base.
+   */
+  public NGSecurityManager(SecurityManager base) {
+    this.base = base;
+  }
+
+  public void checkExit(int status) {
+    if (base != null) {
+      base.checkExit(status);
     }
 
-    public void checkExit(int status) {
-        if (base != null) {
-            base.checkExit(status);
-        }
+    throw new NGExitException(status);
+  }
 
-        throw new NGExitException(status);
+  public void checkPermission(Permission perm) {
+    if (base != null) {
+      base.checkPermission(perm);
     }
+  }
 
-    public void checkPermission(Permission perm) {
-        if (base != null) {
-            base.checkPermission(perm);
-        }
+  public void checkPermission(Permission perm, Object context) {
+    if (base != null) {
+      base.checkPermission(perm, context);
     }
+  }
 
-    public void checkPermission(Permission perm, Object context) {
-        if (base != null) {
-            base.checkPermission(perm, context);
-        }
+  /** Avoid constructing a FilePermission object in checkRead if base manager is null. */
+  public void checkRead(String file) {
+    if (base != null) {
+      super.checkRead(file);
     }
-
-    /**
-     * Avoid constructing a FilePermission object in checkRead if base manager is null.
-     */
-    public void checkRead(String file) {
-        if (base != null) {
-            super.checkRead(file);
-        }
-    }
+  }
 }

@@ -8,14 +8,15 @@
 
     <name>nailgun-server</name>
     <description>
-        Nailgun is a client, protocol, and server for running Java programs from
-        the command line without incurring the JVM startup overhead. Programs run
-        in the server (which is implemented in Java), and are triggered by the
-        client (written in C), which handles all I/O.
+        Nailgun is a client, protocol and server for running Java programs
+        from the command line without incurring the JVM startup overhead.
+        Programs run in the server (which is implemented in Java), and are
+        triggered by the client (C and Python clients available), which
+        handles all I/O.
 
         This project contains the SERVER ONLY.
     </description>
-    <url>http://martiansoftware.com/nailgun</url>
+    <url>http://github.com/facebook/nailgun</url>
 
     <parent>
         <groupId>com.martiansoftware</groupId>
@@ -27,12 +28,24 @@
       <dependency>
         <groupId>net.java.dev.jna</groupId>
         <artifactId>jna</artifactId>
-        <version>4.4.0</version>
+        <version>4.5.2</version>
       </dependency>
       <dependency>
         <groupId>net.java.dev.jna</groupId>
         <artifactId>jna-platform</artifactId>
-        <version>4.4.0</version>
+        <version>4.5.2</version>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-api</artifactId>
+        <version>5.2.0</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-junit-jupiter</artifactId>
+        <version>2.19.1</version>
+        <scope>test</scope>
       </dependency>
     </dependencies>
 
@@ -73,6 +86,47 @@
                   </configuration>
                 </execution>
               </executions>
+            </plugin>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-surefire-plugin</artifactId>
+              <version>2.22.0</version>
+              <configuration>
+                <systemProperties>
+                  <property>
+                    <name>nailgun.server.version</name>
+                    <value>${project.version}</value>
+                  </property>
+                  <property>
+                    <name>jna.nosys</name>
+                    <value>true</value>
+                  </property>
+                </systemProperties>
+             </configuration>
+              <dependencies>
+                <dependency>
+                  <groupId>org.junit.platform</groupId>
+                  <artifactId>junit-platform-surefire-provider</artifactId>
+                  <version>1.2.0</version>
+                </dependency>
+                <dependency>
+                  <groupId>org.junit.jupiter</groupId>
+                  <artifactId>junit-jupiter-engine</artifactId>
+                  <version>5.2.0</version>
+                </dependency>
+              </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>com.coveo</groupId>
+                <artifactId>fmt-maven-plugin</artifactId>
+                <version>2.5.0</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>format</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

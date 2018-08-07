@@ -1,47 +1,42 @@
 /*
 
- Copyright 2004-2015, Martian Software, Inc.
+Copyright 2004-2015, Martian Software, Inc.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
- http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
- */
+*/
 package com.martiansoftware.nailgun;
 
 import com.sun.jna.LastErrorException;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-
-import java.nio.ByteBuffer;
-
 import java.net.Socket;
+import java.nio.ByteBuffer;
 
 /**
  * Implements a {@link Socket} backed by a native Unix domain socket.
  *
- * Instances of this class always return {@code null} for
- * {@link Socket#getInetAddress()}, {@link Socket#getLocalAddress()},
- * {@link Socket#getLocalSocketAddress()}, {@link Socket#getRemoteSocketAddress()}.
+ * <p>Instances of this class always return {@code null} for {@link Socket#getInetAddress()}, {@link
+ * Socket#getLocalAddress()}, {@link Socket#getLocalSocketAddress()}, {@link
+ * Socket#getRemoteSocketAddress()}.
  */
 public class NGUnixDomainSocket extends Socket {
   private final ReferenceCountedFileDescriptor fd;
   private final InputStream is;
   private final OutputStream os;
 
-  /**
-   * Creates a Unix domain socket backed by a native file descriptor.
-   */
+  /** Creates a Unix domain socket backed by a native file descriptor. */
   public NGUnixDomainSocket(int fd) {
     this.fd = new ReferenceCountedFileDescriptor(fd);
     this.is = new NGUnixDomainSocketInputStream();
@@ -156,8 +151,13 @@ public class NGUnixDomainSocket extends Socket {
         int ret = NGUnixDomainSocketLibrary.write(fdToWrite, buf, buf.remaining());
         if (ret != buf.remaining()) {
           // This shouldn't happen with standard blocking Unix domain sockets.
-          throw new IOException("Could not write " + buf.remaining() + " bytes as requested " +
-                                "(wrote " + ret + " bytes instead)");
+          throw new IOException(
+              "Could not write "
+                  + buf.remaining()
+                  + " bytes as requested "
+                  + "(wrote "
+                  + ret
+                  + " bytes instead)");
         }
       } catch (LastErrorException e) {
         throw new IOException(e);

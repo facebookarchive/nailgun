@@ -1,7 +1,7 @@
 /nailgun-server/target/
 /nailgun-examples/target/
+/nailgun-client/target/
 /target/
-ng
 *.iml
 *.pyc
 .idea/

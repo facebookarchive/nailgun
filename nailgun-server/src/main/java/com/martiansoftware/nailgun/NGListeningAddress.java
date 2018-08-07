@@ -1,27 +1,26 @@
 /*
 
- Copyright 2004-2015, Martian Software, Inc.
+Copyright 2004-2015, Martian Software, Inc.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
- http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
- */
+*/
 package com.martiansoftware.nailgun;
 
+import com.sun.jna.Platform;
 import java.net.InetAddress;
 
-/**
- * Represents the address on which the Nailgun server listens.
- */
+/** Represents the address on which the Nailgun server listens. */
 public class NGListeningAddress {
   private final boolean isInet;
   private final boolean isLocal;
@@ -29,9 +28,7 @@ public class NGListeningAddress {
   private final int inetPort;
   private final String localAddress;
 
-  /**
-   * Constructs a listening address for an internet address and port.
-   */
+  /** Constructs a listening address for an internet address and port. */
   public NGListeningAddress(InetAddress inetAddress, int inetPort) {
     this.isInet = true;
     this.isLocal = false;
@@ -40,9 +37,7 @@ public class NGListeningAddress {
     this.localAddress = null;
   }
 
-  /**
-   * Constructs a listening address for a local (Unix domain) address.
-   */
+  /** Constructs a listening address for a local (Unix domain) address. */
   public NGListeningAddress(String localAddress) {
     this.isInet = false;
     this.isLocal = true;
@@ -51,23 +46,19 @@ public class NGListeningAddress {
     this.localAddress = localAddress;
   }
 
-  /**
-   * Returns true if this listening address has an internet address and port.
-   */
+  /** Returns true if this listening address has an internet address and port. */
   public boolean isInetAddress() {
     return isInet;
   }
 
-  /**
-   * Returns true if this listening address has a local (Unix domain) address.
-   */
+  /** Returns true if this listening address has a local (Unix domain) address. */
   public boolean isLocalAddress() {
     return isLocal;
   }
 
   /**
-   * Returns the listening internet address if {@link #isInetAddress()} returns
-   * true. Otherwise, throws.
+   * Returns the listening internet address if {@link #isInetAddress()} returns true. Otherwise,
+   * throws.
    */
   public InetAddress getInetAddress() {
     if (!isInet) {
@@ -77,8 +68,8 @@ public class NGListeningAddress {
   }
 
   /**
-   * Returns the listening internet port if {@link #isInetAddress()} returns
-   * true. Otherwise, throws.
+   * Returns the listening internet port if {@link #isInetAddress()} returns true. Otherwise,
+   * throws.
    */
   public int getInetPort() {
     if (!isInet) {
@@ -88,8 +79,8 @@ public class NGListeningAddress {
   }
 
   /**
-   * Returns the listening local address if {@link #isLocalAddress()} returns
-   * true. Otherwise, throws.
+   * Returns the listening local address if {@link #isLocalAddress()} returns true. Otherwise,
+   * throws.
    */
   public String getLocalAddress() {
     if (!isLocal) {
@@ -108,5 +99,17 @@ public class NGListeningAddress {
     } else {
       return "local socket " + localAddress;
     }
+  }
+
+  /**
+   * Close any instances of local socket, i.e. Unix socket; noop on Windows
+   *
+   * @param localAddress
+   */
+  public static void release(String localAddress) {
+    if (Platform.isWindows()) {
+      return;
+    }
+    NGUnixDomainSocketLibrary.unlink(localAddress);
   }
 }

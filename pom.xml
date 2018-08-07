@@ -20,14 +20,15 @@
 
     <name>nailgun-all</name>
     <description>
-        Nailgun is a client, protocol, and server for running Java programs 
+        Nailgun is a client, protocol and server for running Java programs
         from the command line without incurring the JVM startup overhead. 
         Programs run in the server (which is implemented in Java), and are 
-        triggered by the client (written in C), which handles all I/O.
+        triggered by the client (C and Python clients available), which
+        handles all I/O.
     
         This project contains the server and examples.
     </description>
-    <url>http://martiansoftware.com/nailgun</url>
+    <url>http://github.com/facebook/nailgun</url>
 
     <licenses>
         <license>
@@ -38,17 +39,16 @@
     </licenses>    
 
     <scm>
-        <url>scm:git:git@github.com:martylamb/nailgun.git</url>
-        <connection>scm:git:git@github.com:martylamb/nailgun.git</connection>
-        <developerConnection>scm:git:git@github.com:martylamb/nailgun.git</developerConnection>
+        <url>scm:git:git@github.com:facebook/nailgun.git</url>
+        <connection>scm:git:git@github.com:facebook/nailgun.git</connection>
+        <developerConnection>scm:git:git@github.com:facebook/nailgun.git</developerConnection>
       <tag>nailgun-all-0.9.3</tag>
   </scm>
 
     <developers>
         <developer>
-            <email>mlamb@martiansoftware.com</email>
-            <name>Marty Lamb</name>
-            <url>http://martiansoftware.com</url>
+            <name>Facebook</name>
+            <url>http://github.com/facebook/nailgun</url>
         </developer>
     </developers>
 	

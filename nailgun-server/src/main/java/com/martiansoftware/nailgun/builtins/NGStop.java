@@ -1,4 +1,4 @@
-/*   
+/*
 
   Copyright 2004-2012, Martian Software, Inc.
 
@@ -21,18 +21,17 @@ package com.martiansoftware.nailgun.builtins;
 import com.martiansoftware.nailgun.NGContext;
 
 /**
- * <p>Shuts down the currently running server.</p>  
- * 
- * <p>This is aliased by default to the command "<code>ng-stop</code>".</p>
- * 
+ * Shuts down the currently running server.
+ *
+ * <p>This is aliased by default to the command "<code>ng-stop</code>".
+ *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
 public class NGStop {
 
-	public static void nailMain(NGContext context) {
-		// just let the server know it needs to shut down
-		// shutdown will happen asynchronously allowing this nail to cleanly exit with status 0
-		context.getNGServer().signalExit();
-	}
-
+  public static void nailMain(NGContext context) {
+    // just let the server know it needs to shut down
+    // shutdown will happen asynchronously allowing this nail to cleanly exit with status 0
+    context.getNGServer().signalExit();
+  }
 }
