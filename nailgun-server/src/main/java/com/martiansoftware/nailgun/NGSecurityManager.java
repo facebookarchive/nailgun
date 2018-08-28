@@ -18,6 +18,8 @@ limitations under the License.
 
 package com.martiansoftware.nailgun;
 
+import java.io.FileDescriptor;
+import java.net.InetAddress;
 import java.security.Permission;
 
 /**
@@ -58,10 +60,144 @@ public class NGSecurityManager extends SecurityManager {
     }
   }
 
-  /** Avoid constructing a FilePermission object in checkRead if base manager is null. */
+  // Overrides below avoid the cost of creating Permissions objects if base manager is null.
+  // FilePermission, in particular, is expensive to create. 
+
   public void checkRead(String file) {
     if (base != null) {
       super.checkRead(file);
+    }
+  }
+
+  public void checkCreateClassLoader() {
+    if (base != null) {
+      super.checkCreateClassLoader();
+    }
+  }
+
+  public void checkAccess(Thread t) {
+    if (base != null) {
+      super.checkAccess(t);
+    }
+  }
+
+  public void checkAccess(ThreadGroup g) {
+    if (base != null) {
+      super.checkAccess(g);
+    }
+  }
+
+  public void checkExec(String cmd) {
+    if (base != null) {
+      super.checkExec(cmd);
+    }
+  }
+
+  public void checkLink(String lib) {
+    if (base != null) {
+      super.checkLink(lib);
+    }
+  }
+
+  public void checkRead(FileDescriptor fd) {
+    if (base != null) {
+      super.checkRead(fd);
+    }
+  }
+
+  public void checkRead(String file, Object context) {
+    if (base != null) {
+      super.checkRead(file, context);
+    }
+  }
+
+  public void checkWrite(FileDescriptor fd) {
+    if (base != null) {
+      super.checkWrite(fd);
+    }
+  }
+
+  public void checkWrite(String file) {
+    if (base != null) {
+      super.checkWrite(file);
+    }
+  }
+
+  public void checkDelete(String file) {
+    if (base != null) {
+      super.checkDelete(file);
+    }
+  }
+
+  public void checkConnect(String host, int port) {
+    if (base != null) {
+      super.checkConnect(host, port);
+    }
+  }
+
+  public void checkConnect(String host, int port, Object context) {
+    if (base != null) {
+      super.checkConnect(host, port, context);
+    }
+  }
+
+  public void checkListen(int port) {
+    if (base != null) {
+      super.checkListen(port);
+    }
+  }
+
+  public void checkAccept(String host, int port) {
+    if (base != null) {
+      super.checkAccept(host, port);
+    }
+  }
+
+  public void checkMulticast(InetAddress maddr) {
+    if (base != null) {
+      super.checkMulticast(maddr);
+    }
+  }
+
+  public void checkPropertiesAccess() {
+    if (base != null) {
+      super.checkPropertiesAccess();
+    }
+  }
+
+  public void checkPropertyAccess(String key) {
+    if (base != null) {
+      super.checkPropertyAccess(key);
+    }
+  }
+
+  public void checkPrintJobAccess() {
+    if (base != null) {
+      super.checkPrintJobAccess();
+    }
+  }
+
+  public void checkPackageAccess(String pkg) {
+    if (base != null) {
+      super.checkPackageAccess(pkg);
+    }
+  }
+
+  public void checkPackageDefinition(String pkg) {
+    if (base != null) {
+      super.checkPackageDefinition(pkg);
+    }
+  }
+
+  public void checkSetFactory() {
+    if (base != null) {
+      super.checkSetFactory();
+    }
+  }
+
+  public void checkSecurityAccess(String target) {
+    if (base != null) {
+      super.checkSecurityAccess(target);
     }
   }
 }
