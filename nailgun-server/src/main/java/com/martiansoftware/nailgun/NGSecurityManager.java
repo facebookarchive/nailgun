@@ -65,139 +65,139 @@ public class NGSecurityManager extends SecurityManager {
 
   public void checkRead(String file) {
     if (base != null) {
-      super.checkRead(file);
+      base.checkRead(file);
     }
   }
 
   public void checkCreateClassLoader() {
     if (base != null) {
-      super.checkCreateClassLoader();
+      base.checkCreateClassLoader();
     }
   }
 
   public void checkAccess(Thread t) {
     if (base != null) {
-      super.checkAccess(t);
+      base.checkAccess(t);
     }
   }
 
   public void checkAccess(ThreadGroup g) {
     if (base != null) {
-      super.checkAccess(g);
+      base.checkAccess(g);
     }
   }
 
   public void checkExec(String cmd) {
     if (base != null) {
-      super.checkExec(cmd);
+      base.checkExec(cmd);
     }
   }
 
   public void checkLink(String lib) {
     if (base != null) {
-      super.checkLink(lib);
+      base.checkLink(lib);
     }
   }
 
   public void checkRead(FileDescriptor fd) {
     if (base != null) {
-      super.checkRead(fd);
+      base.checkRead(fd);
     }
   }
 
   public void checkRead(String file, Object context) {
     if (base != null) {
-      super.checkRead(file, context);
+      base.checkRead(file, context);
     }
   }
 
   public void checkWrite(FileDescriptor fd) {
     if (base != null) {
-      super.checkWrite(fd);
+      base.checkWrite(fd);
     }
   }
 
   public void checkWrite(String file) {
     if (base != null) {
-      super.checkWrite(file);
+      base.checkWrite(file);
     }
   }
 
   public void checkDelete(String file) {
     if (base != null) {
-      super.checkDelete(file);
+      base.checkDelete(file);
     }
   }
 
   public void checkConnect(String host, int port) {
     if (base != null) {
-      super.checkConnect(host, port);
+      base.checkConnect(host, port);
     }
   }
 
   public void checkConnect(String host, int port, Object context) {
     if (base != null) {
-      super.checkConnect(host, port, context);
+      base.checkConnect(host, port, context);
     }
   }
 
   public void checkListen(int port) {
     if (base != null) {
-      super.checkListen(port);
+      base.checkListen(port);
     }
   }
 
   public void checkAccept(String host, int port) {
     if (base != null) {
-      super.checkAccept(host, port);
+      base.checkAccept(host, port);
     }
   }
 
   public void checkMulticast(InetAddress maddr) {
     if (base != null) {
-      super.checkMulticast(maddr);
+      base.checkMulticast(maddr);
     }
   }
 
   public void checkPropertiesAccess() {
     if (base != null) {
-      super.checkPropertiesAccess();
+      base.checkPropertiesAccess();
     }
   }
 
   public void checkPropertyAccess(String key) {
     if (base != null) {
-      super.checkPropertyAccess(key);
+      base.checkPropertyAccess(key);
     }
   }
 
   public void checkPrintJobAccess() {
     if (base != null) {
-      super.checkPrintJobAccess();
+      base.checkPrintJobAccess();
     }
   }
 
   public void checkPackageAccess(String pkg) {
     if (base != null) {
-      super.checkPackageAccess(pkg);
+      base.checkPackageAccess(pkg);
     }
   }
 
   public void checkPackageDefinition(String pkg) {
     if (base != null) {
-      super.checkPackageDefinition(pkg);
+      base.checkPackageDefinition(pkg);
     }
   }
 
   public void checkSetFactory() {
     if (base != null) {
-      super.checkSetFactory();
+      base.checkSetFactory();
     }
   }
 
   public void checkSecurityAccess(String target) {
     if (base != null) {
-      super.checkSecurityAccess(target);
+      base.checkSecurityAccess(target);
     }
   }
 }
