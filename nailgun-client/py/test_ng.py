@@ -1,3 +1,20 @@
+#!/usr/bin/env python
+#
+# Copyright 2004-2015, Martian Software, Inc.
+# Copyright 2017-Present Facebook, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import subprocess
 import os
 import time
@@ -60,8 +77,8 @@ class TestNailgunConnection(unittest.TestCase):
 
     def getClassPath(self):
         cp = [
-            "nailgun-server/target/nailgun-server-0.9.3-SNAPSHOT-uber.jar",
-            "nailgun-examples/target/nailgun-examples-0.9.3-SNAPSHOT.jar",
+            "nailgun-server/target/nailgun-server-1.0.0-SNAPSHOT-uber.jar",
+            "nailgun-examples/target/nailgun-examples-1.0.0-SNAPSHOT.jar",
         ]
         if os.name == "nt":
             return ";".join(cp)
@@ -119,7 +136,7 @@ class TestNailgunConnection(unittest.TestCase):
                 + suspend
             )
         cmd = cmd + [
-            "com.martiansoftware.nailgun.NGServer",
+            "com.facebook.nailgun.NGServer",
             self.transport_address,
             str(self.heartbeat_timeout_ms),
         ]
@@ -196,7 +213,7 @@ class TestNailgunConnectionMain(TestNailgunConnection):
             exit_code = c.send_command("ng-stats")
         self.assertEqual(exit_code, 0)
         actual_out = output.getvalue().strip()
-        expected_out = "com.martiansoftware.nailgun.builtins.NGServerStats: 1/1"
+        expected_out = "com.facebook.nailgun.builtins.NGServerStats: 1/1"
         self.assertEqual(actual_out, expected_out)
 
     def test_nailgun_exit_code(self):
@@ -206,7 +223,7 @@ class TestNailgunConnectionMain(TestNailgunConnection):
             self.transport_address, stderr=None, stdin=None, stdout=output
         ) as c:
             exit_code = c.send_command(
-                "com.martiansoftware.nailgun.examples.Exit", [str(expected_exit_code)]
+                "com.facebook.nailgun.examples.Exit", [str(expected_exit_code)]
             )
         self.assertEqual(exit_code, expected_exit_code)
 
@@ -218,7 +235,7 @@ class TestNailgunConnectionMain(TestNailgunConnection):
         with NailgunConnection(
             self.transport_address, stderr=None, stdin=input, stdout=output
         ) as c:
-            exit_code = c.send_command("com.martiansoftware.nailgun.examples.Echo")
+            exit_code = c.send_command("com.facebook.nailgun.examples.Echo")
         self.assertEqual(exit_code, 0)
         actual_out = output.getvalue().strip()
         self.assertEqual(actual_out, echo)
@@ -240,7 +257,7 @@ class TestNailgunConnectionMain(TestNailgunConnection):
             # just run Heartbeat nail for 5 seconds. During this period there should be
             # heartbeats received and printed back
             exit_code = c.send_command(
-                "com.martiansoftware.nailgun.examples.Heartbeat", ["5000"]
+                "com.facebook.nailgun.examples.Heartbeat", ["5000"]
             )
         self.assertTrue(output.getvalue().count("H") > 10)
 
@@ -254,7 +271,7 @@ class TestNailgunConnectionMain(TestNailgunConnection):
             heartbeat_interval_sec=0,
         ) as c:
             exit_code = c.send_command(
-                "com.martiansoftware.nailgun.examples.Heartbeat", ["3000"]
+                "com.facebook.nailgun.examples.Heartbeat", ["3000"]
             )
         self.assertTrue(output.getvalue().count("H") == 0)
 
@@ -269,7 +286,7 @@ class TestNailgunConnectionMain(TestNailgunConnection):
                 heartbeat_interval_sec=0.001,
             ) as c:
                 exit_code = c.send_command(
-                    "com.martiansoftware.nailgun.examples.Heartbeat", ["10"]
+                    "com.facebook.nailgun.examples.Heartbeat", ["10"]
                 )
             self.assertEqual(exit_code, 0)
 
@@ -301,7 +318,7 @@ class TestNailgunConnectionSmallHeartbeatTimeout(TestNailgunConnection):
             heartbeat_interval_sec=5,
         ) as c:
             exit_code = c.send_command(
-                "com.martiansoftware.nailgun.examples.Heartbeat", ["30000"]
+                "com.facebook.nailgun.examples.Heartbeat", ["30000"]
             )
         self.assertTrue(output.getvalue().count("H") < 3)
 

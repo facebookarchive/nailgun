@@ -8,9 +8,9 @@
 		<version>7</version>
 	</parent>
 	
-    <groupId>com.martiansoftware</groupId>
+    <groupId>com.facebook</groupId>
     <artifactId>nailgun-all</artifactId>
-    <version>0.9.3-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
    
     <properties>
@@ -42,7 +42,7 @@
         <url>scm:git:git@github.com:facebook/nailgun.git</url>
         <connection>scm:git:git@github.com:facebook/nailgun.git</connection>
         <developerConnection>scm:git:git@github.com:facebook/nailgun.git</developerConnection>
-      <tag>nailgun-all-0.9.3</tag>
+      <tag>nailgun-all-1.0.0</tag>
   </scm>
 
     <developers>

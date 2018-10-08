@@ -22,6 +22,6 @@ you will additionally need to "make ng.exe".
 
 A ruby client is available through the [railgun](https://github.com/timuralp/railgun) project.
 
-For more information, see [the nailgun website](http://martiansoftware.com/nailgun/).
+For more information, see [the nailgun website](https://github.com/facebook/nailgun).
 
 

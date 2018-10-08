@@ -1,6 +1,6 @@
 /*
-
   Copyright 2004-2012, Martian Software, Inc.
+  Copyright 2017-Present Facebook, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   See the License for the specific language governing permissions and
   limitations under the License.
-
 */
 
 /**
@@ -42,7 +41,7 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#define NAILGUN_VERSION "0.9.0"
+#define NAILGUN_VERSION "1.0.0"
 
 #define BUFSIZE (2048)
 
