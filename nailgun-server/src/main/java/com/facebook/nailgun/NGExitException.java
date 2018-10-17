@@ -1,4 +1,7 @@
 /*
+ * Copyright 2004-2012, Martian Software, Inc.
+ * Copyright 2017-Present Facebook, Inc
+ *
  * This class is based upon org.apache.tools.ant.ExitException and is
  * subject to the following:
  *
