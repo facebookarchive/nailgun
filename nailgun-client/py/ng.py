@@ -797,8 +797,11 @@ def send_thread_main(conn):
             while not conn.send_queue.empty():
                 # only this thread can deplete the queue, so it is safe to use blocking get()
                 (chunk_type, buf) = conn.send_queue.get()
-                struct.pack_into(">ic", header_buf, 0, len(buf), chunk_type)
+
                 bbuf = to_bytes(buf)
+                byte_count=len(bbuf)
+
+                struct.pack_into(">ic", header_buf, 0, byte_count, chunk_type)
 
                 # these chunk types are not required for server to accept and process and server may terminate
                 # any time without waiting for them
