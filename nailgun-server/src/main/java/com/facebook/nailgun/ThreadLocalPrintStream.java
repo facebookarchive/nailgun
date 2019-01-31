@@ -29,7 +29,7 @@ import java.io.PrintStream;
  *
  * @author <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a>
  */
-public class ThreadLocalPrintStream extends PrintStream {
+class ThreadLocalPrintStream extends PrintStream {
 
   /** The PrintStreams for the various threads */
   private InheritableThreadLocal streams = null;
@@ -54,7 +54,7 @@ public class ThreadLocalPrintStream extends PrintStream {
    *
    * @param streamForCurrentThread the PrintStream for the current thread
    */
-  public void init(PrintStream streamForCurrentThread) {
+  void init(PrintStream streamForCurrentThread) {
     streams.set(streamForCurrentThread);
   }
 
@@ -63,7 +63,7 @@ public class ThreadLocalPrintStream extends PrintStream {
    *
    * @return this thread's PrintStream
    */
-  public PrintStream getPrintStream() {
+  PrintStream getPrintStream() {
     PrintStream result = (PrintStream) streams.get();
     return ((result == null) ? defaultPrintStream : result);
   }
