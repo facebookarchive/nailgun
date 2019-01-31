@@ -117,6 +117,24 @@ public class NGContext {
     return workingDirectory;
   }
 
+  public void setIn(InputStream in) {
+    this.in = in;
+    ThreadLocalInputStream tls = (ThreadLocalInputStream) System.in;
+    tls.init(in);
+  }
+
+  public void setOut(PrintStream out) {
+    this.out = out;
+    ThreadLocalPrintStream tls = (ThreadLocalPrintStream) System.out;
+    tls.init(out);
+  }
+
+  public void setErr(PrintStream err) {
+    this.err = err;
+    ThreadLocalPrintStream tls = (ThreadLocalPrintStream) System.err;
+    tls.init(err);
+  }
+
   void setEnv(Properties remoteEnvironment) {
     this.remoteEnvironment = remoteEnvironment;
   }
