@@ -125,6 +125,9 @@ public class NGContext {
    */
   public void setIn(InputStream in) {
     this.in = in;
+    if (!(System.in instanceof ThreadLocalInputStream)) {
+      throw new IllegalStateException("System.in should be set by nailgun.");
+    }
     ThreadLocalInputStream tls = (ThreadLocalInputStream) System.in;
     tls.init(in);
   }
@@ -137,6 +140,9 @@ public class NGContext {
    */
   public void setOut(PrintStream out) {
     this.out = out;
+    if (!(System.out instanceof ThreadLocalPrintStream)) {
+      throw new IllegalStateException("System.out should be set by nailgun.");
+    }
     ThreadLocalPrintStream tls = (ThreadLocalPrintStream) System.out;
     tls.init(out);
   }
@@ -149,6 +155,9 @@ public class NGContext {
    */
   public void setErr(PrintStream err) {
     this.err = err;
+    if (!(System.err instanceof ThreadLocalPrintStream)) {
+      throw new IllegalStateException("System.err should be set by nailgun.");
+    }
     ThreadLocalPrintStream tls = (ThreadLocalPrintStream) System.err;
     tls.init(err);
   }
