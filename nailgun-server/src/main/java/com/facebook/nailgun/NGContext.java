@@ -117,18 +117,36 @@ public class NGContext {
     return workingDirectory;
   }
 
+  /**
+   * Sets the current {@link InputStream} for standard input for the current nail.
+   *
+   * @param in The {@link InputStream} to use as stdin for the current nail. This should be an
+   *     InputStream that ultimately reads from {@link NGInputStream}.
+   */
   public void setIn(InputStream in) {
     this.in = in;
     ThreadLocalInputStream tls = (ThreadLocalInputStream) System.in;
     tls.init(in);
   }
 
+  /**
+   * Sets the current {@link PrintStream} for standard output for the current nail.
+   *
+   * @param out The {@link PrintStream} to use as stdout for the current nail. This should be a
+   *     PrintStream that ultimately writes to {@link NGOutputStream}.
+   */
   public void setOut(PrintStream out) {
     this.out = out;
     ThreadLocalPrintStream tls = (ThreadLocalPrintStream) System.out;
     tls.init(out);
   }
 
+  /**
+   * Sets the current {@link PrintStream} for standard error for the current nail.
+   *
+   * @param err The {@link PrintStream} to use as stderr for the current nail. This should be a
+   *     PrintStream that ultimately writes to {@link NGOutputStream}.
+   */
   public void setErr(PrintStream err) {
     this.err = err;
     ThreadLocalPrintStream tls = (ThreadLocalPrintStream) System.err;
