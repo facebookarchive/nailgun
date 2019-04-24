@@ -1,6 +1,8 @@
 nailgun
 =======
 
+[![Build Status](https://travis-ci.org/facebook/nailgun.svg)](https://travis-ci.org/facebook/nailgun) [![Build status](https://ci.appveyor.com/api/projects/status/v64qh0cd2cp9uto8/branch/master?svg=true)](https://ci.appveyor.com/project/Facebook/buck/branch/master)
+
 ---
 **Note:**  Nailgun is based on original code developed by <a href="http://martylamb.com/">Marty Lamb</a>.
 In October, 2017, Marty transferred the repository to Facebook, where it is currently
