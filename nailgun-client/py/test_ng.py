@@ -77,8 +77,8 @@ class TestNailgunConnection(unittest.TestCase):
 
     def getClassPath(self):
         cp = [
-            "nailgun-server/target/nailgun-server-1.0.0-SNAPSHOT-uber.jar",
-            "nailgun-examples/target/nailgun-examples-1.0.0-SNAPSHOT.jar",
+            "nailgun-server/target/nailgun-server-1.0.0-uber.jar",
+            "nailgun-examples/target/nailgun-examples-1.0.0.jar",
         ]
         if os.name == "nt":
             return ";".join(cp)
