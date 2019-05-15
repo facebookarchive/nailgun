@@ -803,6 +803,15 @@ int main(int argc, char *argv[], char *env[]) {
     }
   #endif
 
+#ifndef MSG_NOSIGNAL
+#ifdef SO_NOSIGPIPE
+  int option_value = 1;
+  if (setsockopt(nailgunsocket, SOL_SOCKET, SO_NOSIGPIPE, &option_value, sizeof(option_value)) < 0) {
+    perror("setsockopt");
+  }
+#endif
+#endif
+
   if (connect(nailgunsocket, server_addr, server_addr_len) == -1) {
     perror("connect");
     cleanUpAndExit(NAILGUN_CONNECT_FAILED);
