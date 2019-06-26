@@ -22,7 +22,12 @@ The client is built using make.  From the project directory,
 "make && sudo make install" will do it.  To create the windows client
 you will additionally need to "make ng.exe".
 
-A ruby client is available through the [railgun](https://github.com/timuralp/railgun) project.
+This repository contains implementations of a nailgun client in Python and in C.
+
+For additional client implementations in other languages, see:
+
+1. [sailgun](https://github.com/jvican/sailgun), a client implementation written in Scala that compiles to native.
+1. [railgun](https://github.com/timuralp/railgun), a client implementation written in Ruby.
 
 For more information, see [the nailgun website](https://github.com/facebook/nailgun).
 
