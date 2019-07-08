@@ -24,6 +24,8 @@ you will additionally need to "make ng.exe".
 
 A ruby client is available through the [railgun](https://github.com/timuralp/railgun) project.
 
+A PHP client is also available through the [nailgun-php](https://github.com/alirezameskin/nailgun-php) project.
+
 For more information, see [the nailgun website](https://github.com/facebook/nailgun).
 
 
