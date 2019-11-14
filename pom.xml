@@ -11,7 +11,7 @@
 
   <groupId>com.facebook</groupId>
   <artifactId>nailgun-all</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
   <packaging>pom</packaging>
 
   <properties>
@@ -43,7 +43,7 @@
     <url>scm:git:git@github.com:facebook/nailgun.git</url>
     <connection>scm:git:git@github.com:facebook/nailgun.git</connection>
     <developerConnection>scm:git:git@github.com:facebook/nailgun.git</developerConnection>
-    <tag>nailgun-all-1.0.0</tag>
+    <tag>nailgun-all-1.0.1</tag>
   </scm>
 
   <developers>
