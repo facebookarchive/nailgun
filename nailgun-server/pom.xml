@@ -21,7 +21,7 @@
     <parent>
         <groupId>com.facebook</groupId>
         <artifactId>nailgun-all</artifactId>
-        <version>1.0.0</version>
+        <version>1.0.1</version>
     </parent>
 
     <dependencies>
