@@ -17,6 +17,13 @@
 
 set -eux
 
+export JAVA_HOME="/usr/lib/jvm/java-8-openjdk-amd64"
+if [ ! -d "$JAVA_HOME" ]; then
+  echo "Could not find ${JAVA_HOME}. Try one of these?"
+  find /usr/lib/jvm -type d
+  exit 1
+fi
+
 mvn package
 
 export PYTHONPATH=.

@@ -2,7 +2,7 @@ language: python
 addons:
   apt:
     packages:
-      - oracle-java8-installer
+      - openjdk-8-jdk
       - mingw-w64
 python:
   - "2.7"
