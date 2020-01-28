@@ -77,8 +77,8 @@ class TestNailgunConnection(unittest.TestCase):
 
     def getClassPath(self):
         cp = [
-            "nailgun-server/target/nailgun-server-1.0.0-uber.jar",
-            "nailgun-examples/target/nailgun-examples-1.0.0.jar",
+            "nailgun-server/target/nailgun-server-1.0.1-uber.jar",
+            "nailgun-examples/target/nailgun-examples-1.0.1.jar",
         ]
         if os.name == "nt":
             return ";".join(cp)
@@ -215,6 +215,22 @@ class TestNailgunConnectionMain(TestNailgunConnection):
         actual_out = output.getvalue().strip()
         expected_out = "com.facebook.nailgun.builtins.NGServerStats: 1/1"
         self.assertEqual(actual_out, expected_out)
+
+    def test_nailgun_with_utf8_environ(self):
+        output = StringIO()
+        with NailgunConnection(
+            self.transport_address, stderr=None, stdin=None, stdout=output
+        ) as c:
+            env = os.environ.copy()
+            # foo <BOX DRAWINGS LIGHT DOWN AND RIGHT> <BOX DRAWINGS LIGHT HORIZONTAL> bar
+            env["WITH_UTF8"] = "foo\xe2\x94\x8c\xe2\x94\x80bar"
+            exit_code = c.send_command("ng-stats", env=env)
+
+        self.assertEqual(exit_code, 0)
+        actual_out = output.getvalue().strip()
+        expected_out = "com.facebook.nailgun.builtins.NGServerStats: 1/1"
+        self.assertEqual(actual_out, expected_out)
+
 
     def test_nailgun_exit_code(self):
         output = StringIO()
