@@ -24,6 +24,7 @@ import shutil
 import uuid
 import sys
 
+from io import BytesIO
 from ng import NailgunException, NailgunConnection
 
 is_py2 = sys.version[0] == "2"
@@ -206,18 +207,18 @@ class TestNailgunConnectionMain(TestNailgunConnection):
         super(TestNailgunConnectionMain, self).__init__(*args, **kwargs)
 
     def test_nailgun_stats(self):
-        output = StringIO()
+        output = BytesIO()
         with NailgunConnection(
             self.transport_address, stderr=None, stdin=None, stdout=output
         ) as c:
             exit_code = c.send_command("ng-stats")
         self.assertEqual(exit_code, 0)
-        actual_out = output.getvalue().strip()
+        actual_out = output.getvalue().decode('utf8').strip()
         expected_out = "com.facebook.nailgun.builtins.NGServerStats: 1/1"
         self.assertEqual(actual_out, expected_out)
 
     def test_nailgun_with_utf8_environ(self):
-        output = StringIO()
+        output = BytesIO()
         with NailgunConnection(
             self.transport_address, stderr=None, stdin=None, stdout=output
         ) as c:
@@ -227,13 +228,13 @@ class TestNailgunConnectionMain(TestNailgunConnection):
             exit_code = c.send_command("ng-stats", env=env)
 
         self.assertEqual(exit_code, 0)
-        actual_out = output.getvalue().strip()
+        actual_out = output.getvalue().decode('utf8').strip()
         expected_out = "com.facebook.nailgun.builtins.NGServerStats: 1/1"
         self.assertEqual(actual_out, expected_out)
 
 
     def test_nailgun_exit_code(self):
-        output = StringIO()
+        output = BytesIO()
         expected_exit_code = 10
         with NailgunConnection(
             self.transport_address, stderr=None, stdin=None, stdout=output
@@ -246,14 +247,14 @@ class TestNailgunConnectionMain(TestNailgunConnection):
     def test_nailgun_stdin(self):
         lines = [str(i) for i in range(100)]
         echo = "\n".join(lines)
-        output = StringIO()
+        output = BytesIO()
         input = StringIO(echo)
         with NailgunConnection(
             self.transport_address, stderr=None, stdin=input, stdout=output
         ) as c:
             exit_code = c.send_command("com.facebook.nailgun.examples.Echo")
         self.assertEqual(exit_code, 0)
-        actual_out = output.getvalue().strip()
+        actual_out = output.getvalue().decode('utf8').strip()
         self.assertEqual(actual_out, echo)
 
     def test_nailgun_default_streams(self):
@@ -262,7 +263,7 @@ class TestNailgunConnectionMain(TestNailgunConnection):
         self.assertEqual(exit_code, 0)
 
     def test_nailgun_heartbeats(self):
-        output = StringIO()
+        output = BytesIO()
         with NailgunConnection(
             self.transport_address,
             stderr=None,
@@ -275,10 +276,10 @@ class TestNailgunConnectionMain(TestNailgunConnection):
             exit_code = c.send_command(
                 "com.facebook.nailgun.examples.Heartbeat", ["5000"]
             )
-        self.assertTrue(output.getvalue().count("H") > 10)
+        self.assertTrue(output.getvalue().decode('utf8').count("H") > 10)
 
     def test_nailgun_no_heartbeat(self):
-        output = StringIO()
+        output = BytesIO()
         with NailgunConnection(
             self.transport_address,
             stderr=None,
@@ -289,10 +290,10 @@ class TestNailgunConnectionMain(TestNailgunConnection):
             exit_code = c.send_command(
                 "com.facebook.nailgun.examples.Heartbeat", ["3000"]
             )
-        self.assertTrue(output.getvalue().count("H") == 0)
+        self.assertTrue(output.getvalue().decode('utf8').count("H") == 0)
 
     def test_stress_nailgun_socket_close_without_race_condition(self):
-        output = StringIO()
+        output = BytesIO()
         for i in range(1000):
             with NailgunConnection(
                 self.transport_address,
@@ -306,6 +307,15 @@ class TestNailgunConnectionMain(TestNailgunConnection):
                 )
             self.assertEqual(exit_code, 0)
 
+    def test_nailgun_handles_nonutf8_on_stdout(self):
+        output = BytesIO()
+        with NailgunConnection(
+            self.transport_address, stderr=None, stdin=None, stdout=output
+        ) as c:
+            exit_code = c.send_command("com.facebook.nailgun.examples.BinaryEcho", ["2048"])
+        self.assertEqual(exit_code, 0)
+        actual_out = output.getvalue()
+        self.assertEqual(actual_out, b"\xe2" * 2048)
 
 class TestNailgunConnectionSmallHeartbeatTimeout(TestNailgunConnection):
     def __init__(self, *args, **kwargs):
@@ -325,7 +335,7 @@ class TestNailgunConnectionSmallHeartbeatTimeout(TestNailgunConnection):
         Server runs for 30 sec given we still have heartbeats, so it should output about 6 'H'
         We assert that number of 'H' is smaller
         """
-        output = StringIO()
+        output = BytesIO()
         with NailgunConnection(
             self.transport_address,
             stderr=None,
@@ -336,7 +346,7 @@ class TestNailgunConnectionSmallHeartbeatTimeout(TestNailgunConnection):
             exit_code = c.send_command(
                 "com.facebook.nailgun.examples.Heartbeat", ["30000"]
             )
-        self.assertTrue(output.getvalue().count("H") < 3)
+        self.assertTrue(output.getvalue().decode('utf8').count("H") < 3)
 
 
 if __name__ == "__main__":
