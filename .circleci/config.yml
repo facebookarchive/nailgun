@@ -36,5 +36,5 @@ workflows:
   version: 2.1
   windows_jobs:
     jobs:
-      windows_build_test
+      - windows_build_test
 
