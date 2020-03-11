@@ -3,14 +3,48 @@ version: 2.1
 orbs:
   win: circleci/windows@2.2.0
 
-windows_environment: &windows_environment
-  PLATFORM: "windows"
-  NAILGUN_ROOT: "C:\\Users\\circleci\\nailgun"
-
 jobs:
+  linux_build_test:
+    environment:
+      NAILGUN_ROOT: "/home/circleci/nailgun"
+    working_directory: "/home/circleci/nailgun"
+    machine:
+      # linux VM
+      image: ubuntu-1604:201903-01
+    steps:
+      - checkout
+      - run:
+          name: Install OpenJDK8
+          command: |
+            sudo apt-get install openjdk-8-jdk
+            sudo update-java-alternatives -s java-1.8.0-openjdk-amd64
+      - run:
+          name: Install mingw-w64
+          command: |
+            sudo apt-get install mingw-w64
+      - run:
+          name: Install Python3.6.2
+          pyenv install -s 3.6.2
+          pyenv global 3.6.2 system
+      - run:
+          name: Make NG
+          command: |
+            cd ${NAILGUN_ROOT}
+            make ng
+            make ng.exe
+      - run:
+          name: Run tests
+          command: |
+            cd ${NAILGUN_ROOT}
+            export PATH="$(pyenv root)/shims:${PATH}"
+            python --version
+            set -ex
+            mvn package
+            export PYTHONPATH=.
+            python nailgun-client/py/test_ng.py
   windows_build_test:
     environment:
-      <<: *windows_environment
+      NAILGUN_ROOT: "C:\\Users\\circleci\\nailgun"
     working_directory: "C:\\Users\\circleci\\nailgun"
     executor: win/default
     steps:
