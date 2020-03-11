@@ -1,7 +1,7 @@
 nailgun
 =======
 
-[![Build Status](https://travis-ci.org/facebook/nailgun.svg)](https://travis-ci.org/facebook/nailgun) [![Build status](https://circleci.com/gh/facebook/nailgun.svg?style=svg)](https://circleci.com/gh/facebook/nailgun)
+[![Build status](https://circleci.com/gh/facebook/nailgun.svg?style=svg)](https://circleci.com/gh/facebook/nailgun)
 
 ---
 **Note:**  Nailgun is based on original code developed by <a href="http://martylamb.com/">Marty Lamb</a>.
