@@ -1,0 +1,40 @@
+version: 2.1
+
+orbs:
+  win: circleci/windows@2.2.0
+
+windows_environment: &windows_environment
+  PLATFORM: "windows"
+  NAILGUN_ROOT: "C:\\Users\\circleci\\nailgun"
+
+jobs:
+  windows_build_test:
+    environment:
+      <<: *windows_environment
+    working_directory: "C:\\Users\\circleci\\nailgun"
+    executor: win/default
+    steps:
+      - checkout
+      - run:
+          name: Install OpenJDK8
+          command: choco install adoptopenjdk8
+          shell: cmd.exe
+      - run:
+          name: Install Maven
+          command: choco install maven -y -f -i
+          shell: cmd.exe
+      - run:
+          name: Build Script
+          command: cd %NAILGUN_ROOT% && refreshenv && mvn package
+          shell: cmd.exe
+      - run:
+          name: Test Script
+          command: cd %NAILGUN_ROOT% && refreshenv && python nailgun-client\py\test_ng.py
+          shell: cmd.exe
+
+workflows:
+  version: 2.1
+  windows_jobs:
+    jobs:
+      windows_build_test
+
