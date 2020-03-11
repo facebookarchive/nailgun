@@ -24,8 +24,9 @@ jobs:
             sudo apt-get install mingw-w64
       - run:
           name: Install Python3.6.2
-          pyenv install -s 3.6.2
-          pyenv global 3.6.2 system
+          command: |
+            pyenv install -s 3.6.2
+            pyenv global 3.6.2 system
       - run:
           name: Make NG
           command: |
@@ -71,4 +72,7 @@ workflows:
   windows_jobs:
     jobs:
       - windows_build_test
+  linux_jobs:
+    jobs:
+      - linux_build_test
 
