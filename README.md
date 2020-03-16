@@ -26,8 +26,8 @@ This repository contains implementations of a nailgun client in Python and in C.
 
 For additional client implementations in other languages, see:
 
-1. [snailgun](https://github.com/jvican/snailgun), a client implementation written in Scala that compiles to native.
-1. [railgun](https://github.com/timuralp/railgun), a client implementation written in Ruby.
+- [snailgun](https://github.com/jvican/snailgun), a client implementation written in Scala that compiles to native.
+- [railgun](https://github.com/timuralp/railgun), a client implementation written in Ruby.
 
 For more information, see [the nailgun website](https://github.com/facebook/nailgun).
 
