@@ -1,0 +1,78 @@
+version: 2.1
+
+orbs:
+  win: circleci/windows@2.2.0
+
+jobs:
+  linux_build_test:
+    environment:
+      NAILGUN_ROOT: "/home/circleci/nailgun"
+    working_directory: "/home/circleci/nailgun"
+    machine:
+      # linux VM
+      image: ubuntu-1604:201903-01
+    steps:
+      - checkout
+      - run:
+          name: Install OpenJDK8
+          command: |
+            sudo apt-get update && sudo apt-get install openjdk-8-jdk
+            sudo update-java-alternatives -s java-1.8.0-openjdk-amd64
+      - run:
+          name: Install mingw-w64
+          command: |
+            sudo apt-get update && sudo apt-get install mingw-w64
+      - run:
+          name: Install Python3.6.2
+          command: |
+            pyenv install -s 3.6.2
+            pyenv global 3.6.2 system
+      - run:
+          name: Make NG
+          command: |
+            cd ${NAILGUN_ROOT}
+            make ng
+            make ng.exe
+      - run:
+          name: Run tests
+          command: |
+            cd ${NAILGUN_ROOT}
+            export PATH="$(pyenv root)/shims:${PATH}"
+            python --version
+            set -ex
+            mvn package
+            export PYTHONPATH=.
+            python nailgun-client/py/test_ng.py
+  windows_build_test:
+    environment:
+      NAILGUN_ROOT: "C:\\Users\\circleci\\nailgun"
+    working_directory: "C:\\Users\\circleci\\nailgun"
+    executor: win/default
+    steps:
+      - checkout
+      - run:
+          name: Install OpenJDK8
+          command: choco install adoptopenjdk8
+          shell: cmd.exe
+      - run:
+          name: Install Maven
+          command: choco install maven -y -f -i
+          shell: cmd.exe
+      - run:
+          name: Build Script
+          command: cd %NAILGUN_ROOT% && refreshenv && mvn package
+          shell: cmd.exe
+      - run:
+          name: Test Script
+          command: cd %NAILGUN_ROOT% && refreshenv && python nailgun-client\py\test_ng.py
+          shell: cmd.exe
+
+workflows:
+  version: 2.1
+  windows_jobs:
+    jobs:
+      - windows_build_test
+  linux_jobs:
+    jobs:
+      - linux_build_test
+
