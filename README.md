@@ -33,11 +33,16 @@ For more information, see [the nailgun website](https://github.com/facebook/nail
 
 ## Additional information
 
-### Example useage
+### Example usage
 
 ```bash
 $ ./nailgun-client/target/ng com.facebook.nailgun.examples.ThreadTest
 ```
+
+### Logging
+
+To enable logging, start the server with `-Djava.util.logging.config.file="logging.properties"`. A relative file path is resolved in respect to the working directory
+(i.e. system property `user.dir`). An example file is at `nailgun-server/src/main/resources/logging.properties` but will only be used if (soft-) linked appropriate. 
 
 ### Aliases
 
