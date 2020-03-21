@@ -41,7 +41,7 @@ public class NGServerStats {
   }
 
   public static void nailMain(NGContext context) {
-    dumpStats(context.getNGServer(), context.out);
+    dumpStats(context.getNGServer(), context.getOut());
   }
 
   private static void dumpStats(NGServer server, java.io.PrintStream out) {

@@ -23,7 +23,8 @@ package com.facebook.nailgun;
  *
  * <p>Implementations of this interface MUST provide a public, no-args constructor.
  */
+@FunctionalInterface
 public interface NonStaticNail {
 
-  public void nailMain(String[] args);
+  void nailMain(String[] args);
 }

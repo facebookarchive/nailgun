@@ -25,6 +25,8 @@ import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
@@ -46,8 +48,16 @@ public class NGServer implements Runnable {
 
   private static final Logger LOG = Logger.getLogger(NGServer.class.getName());
 
+  private static NGServer INSTANCE = null;
+
   /** Default size for thread pool */
   public static final int DEFAULT_SESSIONPOOLSIZE = 2;
+
+  public static final NGServer getInstance() {
+    return INSTANCE;
+  }
+
+  private final URLClassLoader classLoader;
 
   /** The address on which to listen */
   private final NGListeningAddress listeningAddress;
@@ -99,7 +109,7 @@ public class NGServer implements Runnable {
    * @param port the port on which to listen.
    * @param sessionPoolSize the max number of idle sessions allowed by the pool
    */
-  public NGServer(InetAddress addr, int port, int sessionPoolSize, int timeoutMillis) {
+  private NGServer(InetAddress addr, int port, int sessionPoolSize, int timeoutMillis) {
     this(new NGListeningAddress(addr, port), sessionPoolSize, timeoutMillis);
   }
 
@@ -111,7 +121,7 @@ public class NGServer implements Runnable {
    * @param addr the address at which to listen, or <code>null</code> to bind to all local addresses
    * @param port the port on which to listen.
    */
-  public NGServer(InetAddress addr, int port) {
+  private NGServer(InetAddress addr, int port) {
     this(
         new NGListeningAddress(addr, port),
         DEFAULT_SESSIONPOOLSIZE,
@@ -123,7 +133,7 @@ public class NGServer implements Runnable {
    * NGConstants.DEFAULT_PORT</code>). This does <b>not</b> cause the server to start listening. To
    * do so, create a new <code>Thread</code> wrapping this <code>NGServer</code> and start it.
    */
-  public NGServer() {
+  private NGServer() {
     this(
         new NGListeningAddress(null, NGConstants.DEFAULT_PORT),
         DEFAULT_SESSIONPOOLSIZE,
@@ -141,14 +151,29 @@ public class NGServer implements Runnable {
    *     disconnecting them
    */
   public NGServer(NGListeningAddress listeningAddress, int sessionPoolSize, int timeoutMillis) {
+    if (INSTANCE == null) {
+      INSTANCE = this;
+    } else {
+      throw new IllegalStateException("NGServer singleton already initialized");
+    }
+    Thread current = Thread.currentThread();
+    ClassLoader parent = current.getContextClassLoader();
+    // TODO
+    classLoader = new URLClassLoader(new URL[0], parent);
+    current.setContextClassLoader(classLoader);
+
     this.listeningAddress = listeningAddress;
 
-    aliasManager = new AliasManager();
+    aliasManager = new AliasManager(classLoader);
     allNailStats = new HashMap();
     // allow a maximum of 10 idle threads.  probably too high a number
     // and definitely should be configurable in the future
     sessionPool = new NGSessionPool(this, sessionPoolSize);
     heartbeatTimeoutMillis = timeoutMillis;
+  }
+
+  public URLClassLoader getClassLoader() {
+    return classLoader;
   }
 
   /**
@@ -372,7 +397,7 @@ public class NGServer implements Runnable {
       // test_ng.py on *nix relies on reading this line from stdout to start connecting to server.
       out.println(
           "NGServer "
-              + NGConstants.VERSION
+              + NGConstants.getVersion()
               + " started on "
               + listeningAddress.toString()
               + portDescription

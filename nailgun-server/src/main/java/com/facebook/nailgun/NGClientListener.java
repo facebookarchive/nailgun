@@ -16,6 +16,7 @@
 
 package com.facebook.nailgun;
 
+@FunctionalInterface
 public interface NGClientListener {
 
   /**

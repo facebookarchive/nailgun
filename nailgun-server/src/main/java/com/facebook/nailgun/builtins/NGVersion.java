@@ -20,6 +20,8 @@ package com.facebook.nailgun.builtins;
 import com.facebook.nailgun.NGConstants;
 import com.facebook.nailgun.NGContext;
 
+import java.net.MalformedURLException;
+
 /**
  * Displays the version of the NailGun server and exits.
  *
@@ -27,7 +29,8 @@ import com.facebook.nailgun.NGContext;
  */
 public class NGVersion {
 
-  public static void nailMain(NGContext context) {
-    context.out.println("NailGun server version " + NGConstants.VERSION);
+  public static void nailMain(NGContext context) throws MalformedURLException {
+    context.getOut().println("NailGun server version " + NGConstants.getVersion());
+    context.getOut().flush();
   }
 }

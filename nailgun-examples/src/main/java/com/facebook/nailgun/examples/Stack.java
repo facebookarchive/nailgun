@@ -66,10 +66,11 @@ public class Stack {
           sharedStack.wait();
         }
         if (sharedStack.size() > 0) {
-          context.out.println(sharedStack.pop());
+          context.getOut().println(sharedStack.pop());
           exitCode = 0;
         }
       }
+      context.getOut().flush();
       context.exit(exitCode);
       return;
     }

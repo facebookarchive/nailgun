@@ -32,7 +32,8 @@ public class Prompt {
     if (result == null) {
       context.exit(1);
     } else {
-      context.out.println(result);
+      context.getOut().println(result);
+      context.getOut().flush();
     }
   }
 }

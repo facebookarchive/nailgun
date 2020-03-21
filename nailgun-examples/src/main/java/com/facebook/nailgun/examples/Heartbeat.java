@@ -47,7 +47,7 @@ public class Heartbeat {
             }
           });
 
-      context.addHeartbeatListener(() -> context.out.print("H"));
+      context.addHeartbeatListener(() -> context.getOut().print("H"));
 
       synchronized (lock) {
         if (!shutdown.get()) {

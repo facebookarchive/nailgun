@@ -32,7 +32,7 @@ import java.io.PrintStream;
 class ThreadLocalPrintStream extends PrintStream {
 
   /** The PrintStreams for the various threads */
-  private InheritableThreadLocal streams = null;
+  private InheritableThreadLocal<PrintStream> streams = null;
 
   private PrintStream defaultPrintStream = null;
 
@@ -44,7 +44,7 @@ class ThreadLocalPrintStream extends PrintStream {
    */
   public ThreadLocalPrintStream(PrintStream defaultPrintStream) {
     super(defaultPrintStream);
-    streams = new InheritableThreadLocal();
+    streams = new InheritableThreadLocal<>();
     this.defaultPrintStream = defaultPrintStream;
     init(null);
   }
@@ -65,127 +65,154 @@ class ThreadLocalPrintStream extends PrintStream {
    */
   PrintStream getPrintStream() {
     PrintStream result = (PrintStream) streams.get();
-    return ((result == null) ? defaultPrintStream : result);
+    if (result == null || result.checkError()) {
+      result = defaultPrintStream;
+    }
+    return result;
   }
 
   //  BEGIN delegated java.io.PrintStream methods
 
   /** @see java.io.PrintStream#checkError() */
+  @Override
   public boolean checkError() {
-    return (getPrintStream().checkError());
+    return getPrintStream().checkError();
   }
 
   /** @see java.io.PrintStream#close() */
+  @Override
   public void close() {
     getPrintStream().close();
   }
 
   /** @see java.io.PrintStream#flush() */
+  @Override
   public void flush() {
     getPrintStream().flush();
   }
 
   /** @see java.io.PrintStream#print(boolean) */
+  @Override
   public void print(boolean b) {
     getPrintStream().print(b);
   }
 
   /** @see java.io.PrintStream#print(char) */
+  @Override
   public void print(char c) {
     getPrintStream().print(c);
   }
 
   /** @see java.io.PrintStream#print(char[]) */
+  @Override
   public void print(char[] s) {
     getPrintStream().print(s);
   }
 
   /** @see java.io.PrintStream#print(double) */
+  @Override
   public void print(double d) {
     getPrintStream().print(d);
   }
 
   /** @see java.io.PrintStream#print(float) */
+  @Override
   public void print(float f) {
     getPrintStream().print(f);
   }
 
   /** @see java.io.PrintStream#print(int) */
+  @Override
   public void print(int i) {
     getPrintStream().print(i);
   }
 
   /** @see java.io.PrintStream#print(long) */
+  @Override
   public void print(long l) {
     getPrintStream().print(l);
   }
 
   /** @see java.io.PrintStream#print(Object) */
+  @Override
   public void print(Object obj) {
     getPrintStream().print(obj);
   }
 
   /** @see java.io.PrintStream#print(String) */
+  @Override
   public void print(String s) {
     getPrintStream().print(s);
   }
 
   /** @see java.io.PrintStream#println() */
+  @Override
   public void println() {
     getPrintStream().println();
   }
 
   /** @see java.io.PrintStream#println(boolean) */
+  @Override
   public void println(boolean x) {
     getPrintStream().println(x);
   }
 
   /** @see java.io.PrintStream#println(char) */
+  @Override
   public void println(char x) {
     getPrintStream().println(x);
   }
 
   /** @see java.io.PrintStream#println(char[]) */
+  @Override
   public void println(char[] x) {
     getPrintStream().println(x);
   }
 
   /** @see java.io.PrintStream#println(double) */
+  @Override
   public void println(double x) {
     getPrintStream().println(x);
   }
 
   /** @see java.io.PrintStream#println(float) */
+  @Override
   public void println(float x) {
     getPrintStream().println(x);
   }
 
   /** @see java.io.PrintStream#println(int) */
+  @Override
   public void println(int x) {
     getPrintStream().println(x);
   }
 
   /** @see java.io.PrintStream#println(long) */
+  @Override
   public void println(long x) {
     getPrintStream().println(x);
   }
 
   /** @see java.io.PrintStream#println(Object) */
+  @Override
   public void println(Object x) {
     getPrintStream().println(x);
   }
 
   /** @see java.io.PrintStream#println(String) */
+  @Override
   public void println(String x) {
     getPrintStream().println(x);
   }
 
   /** @see java.io.PrintStream#write(byte[],int,int) */
+  @Override
   public void write(byte[] buf, int off, int len) {
     getPrintStream().write(buf, off, len);
   }
 
   /** @see java.io.PrintStream#write(int) */
+  @Override
   public void write(int b) {
     getPrintStream().write(b);
   }
