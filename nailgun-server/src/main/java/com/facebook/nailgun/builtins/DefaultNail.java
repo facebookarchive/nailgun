@@ -32,7 +32,7 @@ import com.facebook.nailgun.NGContext;
 public class DefaultNail {
 
   public static void nailMain(NGContext context) {
-    context.err.println("No such command: " + context.getCommand());
+    context.getErr().println("No such command: " + context.getCommand());
     context.exit(NGConstants.EXIT_NOSUCHCOMMAND);
   }
 }

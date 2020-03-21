@@ -83,8 +83,9 @@ public class Hash {
       // display available algorithms
       Set algs = getCryptoImpls("MessageDigest");
       for (Object alg : algs) {
-        context.out.println(alg);
+        context.getOut().println(alg);
       }
+      context.getOut().flush();
       return;
     }
 
@@ -92,7 +93,7 @@ public class Hash {
     MessageDigest md = MessageDigest.getInstance(args[0]);
 
     byte[] b = new byte[1024];
-    int bytesRead = context.in.read(b);
+    int bytesRead = context.getIn().read(b);
     while (bytesRead != -1) {
       md.update(b, 0, bytesRead);
       bytesRead = System.in.read(b);
@@ -105,6 +106,7 @@ public class Hash {
       buf.append(HEXCHARS[(result[i] >> 4) & 0x0f]);
       buf.append(HEXCHARS[result[i] & 0x0f]);
     }
-    context.out.println(buf);
+    context.getOut().println(buf);
+    context.getOut().flush();
   }
 }

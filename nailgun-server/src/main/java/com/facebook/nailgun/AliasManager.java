@@ -35,14 +35,10 @@ public class AliasManager {
   private Map aliases;
 
   /** Creates a new AliasManager, populating it with default Aliases. */
-  public AliasManager() {
+  public AliasManager(ClassLoader cl) {
     aliases = new java.util.HashMap();
 
     Properties props = new Properties();
-    ClassLoader cl = getClass().getClassLoader();
-    if (cl == null)
-      cl = ClassLoader.getSystemClassLoader(); // needed if nailgun classes are loaded in the boot
-    // classpath.
     try (InputStream is =
         cl.getResourceAsStream("com/facebook/nailgun/builtins/builtins.properties")) {
       props.load(is);

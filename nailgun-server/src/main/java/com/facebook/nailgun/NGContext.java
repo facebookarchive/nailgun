@@ -63,18 +63,22 @@ public class NGContext {
   private String workingDirectory = null;
 
   /** The client's stdin */
-  public InputStream in = null;
+  private InputStream in = null;
 
   /** The client's stdout */
-  public PrintStream out = null;
+  private PrintStream out = null;
 
   /** The client's stderr */
-  public PrintStream err = null;
+  private PrintStream err = null;
 
   private NGCommunicator communicator = null;
 
   /** Creates a new, empty NGContext */
-  public NGContext() {}
+  public NGContext(InputStream in, PrintStream out, PrintStream err) {
+    setIn(in);
+    setOut(out);
+    setErr(err);
+  }
 
   public void setCommunicator(NGCommunicator comm) {
     this.communicator = comm;
@@ -123,7 +127,7 @@ public class NGContext {
    * @param in The {@link InputStream} to use as stdin for the current nail. This should be an
    *     InputStream that ultimately reads from {@link NGInputStream}.
    */
-  public void setIn(InputStream in) {
+  private void setIn(InputStream in) {
     this.in = in;
     if (!(System.in instanceof ThreadLocalInputStream)) {
       throw new IllegalStateException("System.in should be set by nailgun.");
@@ -138,7 +142,7 @@ public class NGContext {
    * @param out The {@link PrintStream} to use as stdout for the current nail. This should be a
    *     PrintStream that ultimately writes to {@link NGOutputStream}.
    */
-  public void setOut(PrintStream out) {
+  private void setOut(PrintStream out) {
     this.out = out;
     if (!(System.out instanceof ThreadLocalPrintStream)) {
       throw new IllegalStateException("System.out should be set by nailgun.");
@@ -153,13 +157,25 @@ public class NGContext {
    * @param err The {@link PrintStream} to use as stderr for the current nail. This should be a
    *     PrintStream that ultimately writes to {@link NGOutputStream}.
    */
-  public void setErr(PrintStream err) {
+  private void setErr(PrintStream err) {
     this.err = err;
     if (!(System.err instanceof ThreadLocalPrintStream)) {
       throw new IllegalStateException("System.err should be set by nailgun.");
     }
     ThreadLocalPrintStream tls = (ThreadLocalPrintStream) System.err;
     tls.init(err);
+  }
+
+  public InputStream getIn() {
+    return in;
+  }
+
+  public PrintStream getOut() {
+    return out;
+  }
+
+  public PrintStream getErr() {
+    return err;
   }
 
   void setEnv(Properties remoteEnvironment) {

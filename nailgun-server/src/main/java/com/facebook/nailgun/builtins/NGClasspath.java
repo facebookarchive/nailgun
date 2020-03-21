@@ -23,6 +23,8 @@ import com.facebook.nailgun.NGContext;
 import java.io.File;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Provides a means to display and add to the system classpath at runtime. If called with no
@@ -36,6 +38,17 @@ import java.net.URLClassLoader;
  */
 public class NGClasspath {
 
+  // TODO: EXTREMELY DANGEROUS IF SET TO TRUE
+  private static final boolean ALLOW_CLASSPATH_MODIFICATION = true;
+
+  private static final Logger LOG = Logger.getLogger(NGClasspath.class.getName());
+
+  private final URLClassLoader classLoader;
+
+  public NGClasspath(URLClassLoader classLoader) {
+    this.classLoader = classLoader;
+  }
+
   /**
    * Adds the specified URL (for a jar or a directory) to the System ClassLoader. This code was
    * written by antony_miguel and posted on
@@ -47,28 +60,43 @@ public class NGClasspath {
    *     would be that your VM is not using a URLClassLoader as the System ClassLoader. This would
    *     result in a ClassClastException that you probably can't do much about.
    */
-  private static void addToSystemClassLoader(URL url) throws Exception {
-    URLClassLoader sysloader = (URLClassLoader) ClassLoader.getSystemClassLoader();
-    Class sysclass = URLClassLoader.class;
-
-    java.lang.reflect.Method method = sysclass.getDeclaredMethod("addURL", new Class[] {URL.class});
+  private void addToClassLoader(URL url) throws Exception {
+    // TODO: non-public method
+    java.lang.reflect.Method method =
+        classLoader.getClass().getDeclaredMethod("addURL", new Class[] {URL.class});
     method.setAccessible(true);
-    method.invoke(sysloader, new Object[] {url});
+    method.invoke(classLoader, new Object[] {url});
   }
 
-  public static void nailMain(NGContext context) throws Exception {
+  public void nailMain(NGContext context) throws Exception {
     String[] args = context.getArgs();
     if (args.length == 0) {
-      URLClassLoader sysLoader = (URLClassLoader) ClassLoader.getSystemClassLoader();
-      URL[] urls = sysLoader.getURLs();
+      ClassLoader cl = classLoader;
+      URL[] urls = classLoader.getURLs();
+      context.getOut().println("classloader urls:");
       for (int i = 0; i < urls.length; ++i) {
-        context.out.println(urls[i]);
+        context.getOut().println("\t" + urls[i]);
       }
+      context.getOut().println("end classloader urls");
+      do {
+        cl = cl.getParent();
+        context.getOut().println("parent classloader: " + cl);
+      } while (cl != null);
     } else {
-      for (int i = 0; i < args.length; ++i) {
-        File file = new File(args[i]);
-        addToSystemClassLoader(file.toURL());
+      if (ALLOW_CLASSPATH_MODIFICATION) {
+        for (int i = 0; i < args.length; ++i) {
+          File file = new File(args[i]);
+          URL url = file.toURI().toURL();
+          if (file.exists()) {
+            addToClassLoader(url);
+          } else {
+            LOG.log(Level.WARNING, "not adding " + url + " as it does not exist");
+          }
+        }
+      } else {
+        LOG.log(Level.SEVERE, "ng-cp classpath changes have been disabled for security");
       }
     }
+    context.getOut().flush();
   }
 }

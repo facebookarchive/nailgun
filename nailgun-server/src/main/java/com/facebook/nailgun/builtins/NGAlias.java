@@ -72,12 +72,15 @@ public class NGAlias {
       }
       for (Iterator i = aliases.iterator(); i.hasNext(); ) {
         Alias alias = (Alias) i.next();
-        context.out.println(
-            padl(alias.getName(), maxAliasLength)
-                + "\t"
-                + padl(alias.getAliasedClass().getName(), maxClassnameLength));
-        context.out.println(padl("", maxAliasLength) + "\t" + alias.getDescription());
-        context.out.println();
+        context
+            .getOut()
+            .println(
+                padl(alias.getName(), maxAliasLength)
+                    + "\t"
+                    + padl(alias.getAliasedClass().getName(), maxClassnameLength));
+        context.getOut().println(padl("", maxAliasLength) + "\t" + alias.getDescription());
+        context.getOut().println();
+        context.getOut().flush();
       }
     } else if (args.length == 2) {
       server.getAliasManager().addAlias(new Alias(args[0], "", Class.forName(args[1])));
