@@ -18,7 +18,6 @@
 package com.facebook.nailgun;
 
 import com.facebook.nailgun.builtins.NGClasspath;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -47,7 +46,7 @@ public class NGSession extends Thread {
 
   private static final Logger LOG = Logger.getLogger(NGSession.class.getName());
 
-  private static final Class<?>[] NGCLASSPATH_ARGS = new Class<?>[] {URLClassLoader.class };
+  private static final Class<?>[] NGCLASSPATH_ARGS = new Class<?>[] {URLClassLoader.class};
 
   /** The server this NGSession is working for */
   private final NGServer server;
@@ -301,7 +300,9 @@ public class NGSession extends Thread {
         if (!isStaticNail) {
           target = cmdclass.getDeclaredConstructor().newInstance(new Object[0]);
         } else if (NGClasspath.class.isAssignableFrom(cmdclass)) {
-          target = cmdclass.getDeclaredConstructor(NGCLASSPATH_ARGS)
+          target =
+              cmdclass
+                  .getDeclaredConstructor(NGCLASSPATH_ARGS)
                   .newInstance(server.getClassLoader());
         }
         mainMethod.invoke(target, methodArgs);

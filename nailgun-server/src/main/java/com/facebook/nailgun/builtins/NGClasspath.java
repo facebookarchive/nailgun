@@ -20,13 +20,9 @@ Copyright 2017-Present Facebook, Inc
 package com.facebook.nailgun.builtins;
 
 import com.facebook.nailgun.NGContext;
-import com.facebook.nailgun.NGSession;
-import com.facebook.nailgun.NonStaticNail;
-
 import java.io.File;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.security.SecureClassLoader;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -66,7 +62,8 @@ public class NGClasspath {
    */
   private void addToClassLoader(URL url) throws Exception {
     // TODO: non-public method
-    java.lang.reflect.Method method = classLoader.getClass().getDeclaredMethod("addURL", new Class[] {URL.class});
+    java.lang.reflect.Method method =
+        classLoader.getClass().getDeclaredMethod("addURL", new Class[] {URL.class});
     method.setAccessible(true);
     method.invoke(classLoader, new Object[] {url});
   }
@@ -75,16 +72,16 @@ public class NGClasspath {
     String[] args = context.getArgs();
     if (args.length == 0) {
       ClassLoader cl = classLoader;
-        URL[] urls = classLoader.getURLs();
-        context.getOut().println("classloader urls:");
-        for (int i = 0; i < urls.length; ++i) {
-          context.getOut().println("\t" + urls[i]);
-        }
-        context.getOut().println("end classloader urls");
-        do {
-          cl = cl.getParent();
-          context.getOut().println("parent classloader: " + cl);
-        } while (cl != null);
+      URL[] urls = classLoader.getURLs();
+      context.getOut().println("classloader urls:");
+      for (int i = 0; i < urls.length; ++i) {
+        context.getOut().println("\t" + urls[i]);
+      }
+      context.getOut().println("end classloader urls");
+      do {
+        cl = cl.getParent();
+        context.getOut().println("parent classloader: " + cl);
+      } while (cl != null);
     } else {
       if (ALLOW_CLASSPATH_MODIFICATION) {
         for (int i = 0; i < args.length; ++i) {

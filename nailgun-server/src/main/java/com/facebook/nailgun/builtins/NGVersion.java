@@ -19,7 +19,6 @@ package com.facebook.nailgun.builtins;
 
 import com.facebook.nailgun.NGConstants;
 import com.facebook.nailgun.NGContext;
-
 import java.net.MalformedURLException;
 
 /**
