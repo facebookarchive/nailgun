@@ -33,6 +33,14 @@ jobs:
             cd ${NAILGUN_ROOT}
             make ng
             make ng.exe
+      - restore_cache:
+          key: v1-nailgun-mvn-{{ checksum "pom.xml" }}
+      - run: mvn dependency:go-offline
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-nailgun-mvn-{{ checksum "pom.xml" }}
+      - run: mvn package
       - run:
           name: Run tests
           command: |
@@ -40,7 +48,6 @@ jobs:
             export PATH="$(pyenv root)/shims:${PATH}"
             python --version
             set -ex
-            mvn package
             export PYTHONPATH=.
             python nailgun-client/py/test_ng.py
   windows_build_test:
