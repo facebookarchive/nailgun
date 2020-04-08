@@ -35,12 +35,11 @@ jobs:
             make ng.exe
       - restore_cache:
           key: v1-nailgun-mvn-{{ checksum "pom.xml" }}
-      - run: mvn dependency:go-offline
+      - run: mvn package
       - save_cache:
           paths:
             - ~/.m2
           key: v1-nailgun-mvn-{{ checksum "pom.xml" }}
-      - run: mvn package
       - run:
           name: Run tests
           command: |
