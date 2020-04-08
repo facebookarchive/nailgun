@@ -50,6 +50,7 @@ jobs:
             set -ex
             export PYTHONPATH=.
             python nailgun-client/py/test_ng.py
+          no_output_timeout: 20m
   windows_build_test:
     environment:
       NAILGUN_ROOT: "C:\\Users\\circleci\\nailgun"
@@ -73,6 +74,7 @@ jobs:
           name: Test Script
           command: cd %NAILGUN_ROOT% && refreshenv && python nailgun-client\py\test_ng.py
           shell: cmd.exe
+          no_output_timeout: 20m
 
 workflows:
   version: 2.1
