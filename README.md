@@ -31,4 +31,3 @@ For additional client implementations in other languages, see:
 
 For more information, see [the nailgun website](https://github.com/facebook/nailgun).
 
-
