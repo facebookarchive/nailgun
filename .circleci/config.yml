@@ -34,12 +34,12 @@ jobs:
             make ng
             make ng.exe
       - restore_cache:
-          key: v1-nailgun-mvn-{{ checksum "pom.xml" }}
+          key: v1-nailgun-mvn-{{ .Branch }}-{{ checksum "pom.xml" }}
       - run: mvn package
       - save_cache:
           paths:
             - ~/.m2
-          key: v1-nailgun-mvn-{{ checksum "pom.xml" }}
+          key: v1-nailgun-mvn-{{ .Branch }}-{{ checksum "pom.xml" }}
       - run:
           name: Run tests
           command: |
@@ -65,10 +65,16 @@ jobs:
           name: Install Maven
           command: choco install maven -y -f -i
           shell: cmd.exe
+      - restore_cache:
+          key: v1-nailgun-mvn-{{ .Branch }}-{{ checksum "pom.xml" }}
       - run:
           name: Build Script
           command: cd %NAILGUN_ROOT% && refreshenv && mvn package
           shell: cmd.exe
+      - save_cache:
+          paths:
+            - C:\Users\circleci\.m2
+          key: v1-nailgun-mvn-{{ .Branch }}-{{ checksum "pom.xml" }}
       - run:
           name: Test Script
           command: cd %NAILGUN_ROOT% && refreshenv && python nailgun-client\py\test_ng.py
