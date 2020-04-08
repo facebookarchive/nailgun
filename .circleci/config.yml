@@ -22,11 +22,17 @@ jobs:
           name: Install mingw-w64
           command: |
             sudo apt-get update && sudo apt-get install mingw-w64
+      - restore_cache:
+          key: v1-nailgun-python-{{ .Branch }}
       - run:
           name: Install Python3.6.2
           command: |
             pyenv install -s 3.6.2
             pyenv global 3.6.2 system
+      - save_cache:
+          paths:
+            - ~/.pyenv
+          key: v1-nailgun-python-{{ .Branch }}
       - run:
           name: Make NG
           command: |
