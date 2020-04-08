@@ -27,8 +27,13 @@ jobs:
       - run:
           name: Install Python3.6.2
           command: |
-            pyenv install -s 3.6.2
-            pyenv global 3.6.2 system
+            export PATH="$(pyenv root)/shims:${PATH}"
+            python_version=`python --version`
+            if [ "${python_version}" != "Python 3.6.2" ]; then
+              # Skip installation if cache restored.
+              pyenv install -s 3.6.2
+              pyenv global 3.6.2 system
+            fi
       - save_cache:
           paths:
             - ~/.pyenv
