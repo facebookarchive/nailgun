@@ -27,6 +27,7 @@ jobs:
       - run:
           name: Install Python3.6.2
           command: |
+            pyenv versions
             pyenv global 3.6.2 system
             export PATH="$(pyenv root)/shims:${PATH}"
             python_version=`python --version`
