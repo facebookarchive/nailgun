@@ -51,6 +51,7 @@ public class NGInputStream extends InputStream {
   }
 
   /** @see java.io.InputStream#read() */
+  @Override
   public int read() throws IOException {
     // have to synchronize all one byte reads to be able to reuse internal buffer and not
     // recreate new buffer on heap each time
@@ -60,11 +61,13 @@ public class NGInputStream extends InputStream {
   }
 
   /** @see java.io.InputStream#read(byte[]) */
+  @Override
   public int read(byte[] b) throws IOException {
     return read(b, 0, b.length);
   }
 
   /** @see java.io.InputStream#read(byte[], int, int) */
+  @Override
   public int read(byte[] b, int offset, int length) throws IOException {
     try {
       return communicator.receive(b, offset, length);

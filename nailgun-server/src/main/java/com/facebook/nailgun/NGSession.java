@@ -38,7 +38,7 @@ import java.util.logging.Logger;
 public class NGSession extends Thread {
 
   @FunctionalInterface
-  public interface CommnunicatorCreator {
+  public static interface CommnunicatorCreator {
     NGCommunicator get(Socket socket) throws IOException;
   }
 
@@ -281,11 +281,8 @@ public class NGSession extends Thread {
       } else {
         try {
           mainMethod = cmdclass.getMethod("nailMain", nailMainSignature);
-          NGContext context = new NGContext();
+          NGContext context = new NGContext(in, out, err);
           context.setArgs(cmdlineArgs);
-          context.in = in;
-          context.out = out;
-          context.err = err;
           context.setCommand(cmdContext.getCommand());
           context.setNGServer(server);
           context.setCommunicator(comm);
@@ -301,8 +298,11 @@ public class NGSession extends Thread {
             methodArgs[0] = cmdlineArgs;
           } catch (NoSuchMethodException ex) {
             // failed to find 'main' too, so give up and throw
-            throw new NGNailNotFoundException(
-                "Can't find nailMain or main functions in " + cmdclass.getName(), ex);
+            NGNailNotFoundException e =
+                new NGNailNotFoundException(
+                    "Can't find nailMain or main functions in " + cmdclass.getName(), ex);
+            LOG.log(Level.SEVERE, e.toString(), e);
+            throw e;
           }
         }
       }

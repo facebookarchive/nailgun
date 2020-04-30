@@ -39,7 +39,8 @@ public class NGWin32NamedPipeSocket extends Socket {
   private final HANDLE readerWaitable;
   private final HANDLE writerWaitable;
 
-  interface CloseCallback {
+  @FunctionalInterface
+  static interface CloseCallback {
     void onNamedPipeSocketClose(HANDLE handle) throws IOException;
   }
 
