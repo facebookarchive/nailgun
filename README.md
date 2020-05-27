@@ -9,6 +9,9 @@ In October, 2017, Marty transferred the repository to Facebook, where it is curr
 maintained by <a href="https://buckbuild.com/">Buck team</a>. Nailgun will remain available under the Apache license, version 2.0.
 ---
 
+Build and Installation
+----------------------
+
 Nailgun is a client, protocol, and server for running Java programs from
 the command line without incurring the JVM startup overhead.
 
@@ -31,3 +34,11 @@ For additional client implementations in other languages, see:
 
 For more information, see [the nailgun website](https://github.com/facebook/nailgun).
 
+License
+-------
+Apache License 2.0
+
+Legal
+-----
+- [Privacy](https://opensource.facebook.com/legal/privacy)
+- [Terms](https://opensource.facebook.com/legal/terms)
