@@ -42,4 +42,3 @@ Legal
 -----
 - [Privacy](https://opensource.facebook.com/legal/privacy)
 - [Terms](https://opensource.facebook.com/legal/terms)
-

@@ -22,17 +22,36 @@ jobs:
           name: Install mingw-w64
           command: |
             sudo apt-get update && sudo apt-get install mingw-w64
+      - restore_cache:
+          key: v1-nailgun-python3.6.2-{{ .Branch }}
       - run:
           name: Install Python3.6.2
           command: |
-            pyenv install -s 3.6.2
-            pyenv global 3.6.2 system
+            pyenv versions
+            export PATH="$(pyenv root)/shims:${PATH}"
+            python_version=`python --version`
+            if [ "${python_version}" != "Python 3.6.2" ]; then
+              # Skip installation if cache restored.
+              pyenv install -s 3.6.2
+              pyenv global 3.6.2 system
+            fi
+      - save_cache:
+          paths:
+            - /opt/circleci/.pyenv
+          key: v1-nailgun-python3.6.2-{{ .Branch }}
       - run:
           name: Make NG
           command: |
             cd ${NAILGUN_ROOT}
             make ng
             make ng.exe
+      - restore_cache:
+          key: v1-nailgun-mvn-{{ .Branch }}-{{ checksum "pom.xml" }}
+      - run: mvn package
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-nailgun-mvn-{{ .Branch }}-{{ checksum "pom.xml" }}
       - run:
           name: Run tests
           command: |
@@ -40,9 +59,9 @@ jobs:
             export PATH="$(pyenv root)/shims:${PATH}"
             python --version
             set -ex
-            mvn package
             export PYTHONPATH=.
             python nailgun-client/py/test_ng.py
+          no_output_timeout: 20m
   windows_build_test:
     environment:
       NAILGUN_ROOT: "C:\\Users\\circleci\\nailgun"
@@ -58,14 +77,21 @@ jobs:
           name: Install Maven
           command: choco install maven -y -f -i
           shell: cmd.exe
+      - restore_cache:
+          key: v1-nailgun-mvn-{{ .Branch }}-{{ checksum "pom.xml" }}
       - run:
           name: Build Script
           command: cd %NAILGUN_ROOT% && refreshenv && mvn package
           shell: cmd.exe
+      - save_cache:
+          paths:
+            - C:\Users\circleci\.m2
+          key: v1-nailgun-mvn-{{ .Branch }}-{{ checksum "pom.xml" }}
       - run:
           name: Test Script
           command: cd %NAILGUN_ROOT% && refreshenv && python nailgun-client\py\test_ng.py
           shell: cmd.exe
+          no_output_timeout: 20m
 
 workflows:
   version: 2.1
