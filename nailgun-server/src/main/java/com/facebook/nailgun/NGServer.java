@@ -372,7 +372,7 @@ public class NGServer implements Runnable {
       // test_ng.py on *nix relies on reading this line from stdout to start connecting to server.
       out.println(
           "NGServer "
-              + NGConstants.VERSION
+              + NGConstants.getVersion()
               + " started on "
               + listeningAddress.toString()
               + portDescription

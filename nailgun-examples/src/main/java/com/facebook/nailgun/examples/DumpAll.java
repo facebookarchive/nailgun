@@ -18,6 +18,8 @@
 package com.facebook.nailgun.examples;
 
 import com.facebook.nailgun.NGContext;
+
+import java.io.PrintStream;
 import java.util.TreeSet;
 
 /**
@@ -28,24 +30,26 @@ import java.util.TreeSet;
 public class DumpAll {
 
   public static void nailMain(NGContext context) {
-    context.out.println();
-    context.out.println("         context.getCommand(): " + context.getCommand());
-    context.out.println("     context.getInetAddress(): " + context.getInetAddress());
-    context.out.println("            context.getPort(): " + context.getPort());
-    context.out.println("context.getWorkingDirectory(): " + context.getWorkingDirectory());
-    context.out.println("   context.getFileSeparator(): " + context.getFileSeparator());
-    context.out.println("   context.getPathSeparator(): " + context.getPathSeparator());
+    PrintStream out = context.getOut();
+    out.println();
+    out.println("         context.getCommand(): " + context.getCommand());
+    out.println("     context.getInetAddress(): " + context.getInetAddress());
+    out.println("            context.getPort(): " + context.getPort());
+    out.println("context.getWorkingDirectory(): " + context.getWorkingDirectory());
+    out.println("   context.getFileSeparator(): " + context.getFileSeparator());
+    out.println("   context.getPathSeparator(): " + context.getPathSeparator());
 
-    context.out.println("\ncontext.getArgs():");
+    out.println("\ncontext.getArgs():");
     for (int i = 0; i < context.getArgs().length; ++i) {
-      context.out.println("   args[" + i + "]=" + context.getArgs()[i]);
+      out.println("   args[" + i + "]=" + context.getArgs()[i]);
     }
 
-    context.out.println("\ncontext.getEnv():");
+    out.println("\ncontext.getEnv():");
     TreeSet keys = new TreeSet(context.getEnv().keySet());
     for (Object okey : keys) {
       String key = (String) okey;
-      context.out.println("   env[\"" + key + "\"]=" + context.getEnv().getProperty(key));
+      out.println("   env[\"" + key + "\"]=" + context.getEnv().getProperty(key));
     }
+    out.flush();
   }
 }

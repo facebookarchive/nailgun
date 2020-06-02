@@ -62,7 +62,7 @@ public class NGClasspath {
       URLClassLoader sysLoader = (URLClassLoader) ClassLoader.getSystemClassLoader();
       URL[] urls = sysLoader.getURLs();
       for (int i = 0; i < urls.length; ++i) {
-        context.out.println(urls[i]);
+        context.getOut().println(urls[i]);
       }
     } else {
       for (int i = 0; i < args.length; ++i) {
