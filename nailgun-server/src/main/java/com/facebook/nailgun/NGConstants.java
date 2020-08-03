@@ -27,6 +27,8 @@ import java.util.Properties;
  */
 public class NGConstants {
 
+  private NGConstants() {}
+
   /** The default NailGun port (2113) */
   public static final int DEFAULT_PORT = 2113;
   /** The exit code sent to clients if nail completed successfully */
