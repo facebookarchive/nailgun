@@ -47,7 +47,7 @@ import java.util.Set;
 public class NGAlias {
 
   private static String padl(String s, int len) {
-    StringBuffer buf = new StringBuffer(s);
+    StringBuilder buf = new StringBuilder(s);
     while (buf.length() < len) buf.append(" ");
     return (buf.toString());
   }
