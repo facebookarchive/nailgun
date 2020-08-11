@@ -87,6 +87,7 @@ public class NGExitException extends SecurityException {
    * will squash this exception; most also calll printStackTrace(), so this re-throws the exception
    * to escape the handling code.
    */
+  @Override
   public void printStackTrace(PrintStream out) {
     throw this;
   }
