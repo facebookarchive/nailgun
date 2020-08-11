@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 class NGServerTest {
 
   /** Encapsulate information about running NGServer */
-  private class NGServerContext {
+  private static class NGServerContext {
     public NGServerContext(NGServer server, Thread thread) {
       this.server = server;
       this.thread = thread;
