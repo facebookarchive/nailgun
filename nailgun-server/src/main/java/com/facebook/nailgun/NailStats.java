@@ -100,6 +100,10 @@ public class NailStats implements Cloneable {
    * @return true iff the specified <code>NailStats</code> object is tracking the same class.
    */
   public boolean equals(Object o) {
+    if (o == null) {
+      return false;
+    }
+
     NailStats other = (NailStats) o;
     return (nailclass.equals(other.nailclass));
   }

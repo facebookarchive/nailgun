@@ -94,7 +94,7 @@ public class Alias implements Comparable {
    * @return true if the specified Alias has the same name as this Alias.
    */
   public boolean equals(Object o) {
-    return (compareTo(o) == 0);
+    return o != null && (compareTo(o) == 0);
   }
 
   /**
