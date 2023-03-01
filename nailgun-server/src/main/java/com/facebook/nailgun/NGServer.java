@@ -315,7 +315,6 @@ public class NGServer implements Runnable {
   /** Listens for new connections and launches NGSession threads to process them. */
   public void run() {
     originalSecurityManager = System.getSecurityManager();
-    System.setSecurityManager(new NGSecurityManager(originalSecurityManager));
 
     if (!(System.in instanceof ThreadLocalInputStream)) {
       System.setIn(new ThreadLocalInputStream(in));
