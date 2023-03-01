@@ -17,20 +17,23 @@
 
 package com.facebook.nailgun.examples;
 
+import com.facebook.nailgun.NGContext;
+
 /** Finish nail with provided exit code */
 public class Exit {
 
-  public static void main(String[] args) {
+  public static void nailMain(NGContext context) {
+
     int exitCode = (int) ((Math.random() * 1000) + 1);
-    if (args.length > 0) {
+    if (context.getArgs().length > 0) {
       try {
-        exitCode = Integer.parseInt(args[0]);
+        exitCode = Integer.parseInt(context.getArgs()[0]);
       } catch (Exception e) {
       }
     }
     // Close stdout to test the exit code is returned properly
     // even in such case
     System.out.close();
-    System.exit(exitCode);
+    context.exit(exitCode);
   }
 }
