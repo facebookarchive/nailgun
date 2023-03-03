@@ -85,9 +85,6 @@ public class NGServer implements Runnable {
   /** a collection of all classes executed by this server so far */
   private final Map<String, NailStats> allNailStats;
 
-  /** Remember the security manager we start with so we can restore it later */
-  private SecurityManager originalSecurityManager = null;
-
   private final int heartbeatTimeoutMillis;
 
   /**
@@ -314,8 +311,6 @@ public class NGServer implements Runnable {
 
   /** Listens for new connections and launches NGSession threads to process them. */
   public void run() {
-    originalSecurityManager = System.getSecurityManager();
-
     if (!(System.in instanceof ThreadLocalInputStream)) {
       System.setIn(new ThreadLocalInputStream(in));
     }
@@ -407,8 +402,6 @@ public class NGServer implements Runnable {
     System.setIn(in);
     System.setOut(out);
     System.setErr(err);
-
-    System.setSecurityManager(originalSecurityManager);
 
     running.set(false);
   }
