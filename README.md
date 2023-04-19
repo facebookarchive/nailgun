@@ -6,8 +6,12 @@ nailgun
 ---
 
 **Note:**  Nailgun is based on original code developed by <a href="http://martylamb.com/">Marty Lamb</a>.
-In October, 2017, Marty transferred the repository to Facebook, where it is currently
-maintained by <a href="https://buckbuild.com/">Buck team</a>. Nailgun will remain available under the Apache license, version 2.0.
+In October, 2017, Marty transferred the repository to Facebook, where it is was previously
+maintained by <a href="https://buck.build/">the Buck1 team</a>. In April, 2023, Buck1 was deprecated in
+favor of <a href="https://buck2.build/">Buck2</a>, which does not use Nailgun.
+As a result this repository is now unmaintained.
+
+Nailgun remains available under the Apache license, version 2.0.
 
 ---
 
