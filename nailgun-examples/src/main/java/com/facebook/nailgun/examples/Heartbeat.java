@@ -55,8 +55,8 @@ public class Heartbeat {
         }
       }
     } catch (InterruptedException ignored) {
-      System.exit(42);
+      context.exit(42);
     }
-    System.exit(0);
+    context.exit(0);
   }
 }

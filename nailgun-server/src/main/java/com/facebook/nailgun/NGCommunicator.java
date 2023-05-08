@@ -100,9 +100,7 @@ public class NGCommunicator implements Closeable {
 
       @Override
       public Thread newThread(Runnable r) {
-        SecurityManager s = System.getSecurityManager();
-        ThreadGroup group =
-            (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
+        ThreadGroup group = Thread.currentThread().getThreadGroup();
         Thread t = new Thread(group, r, this.threadName, 0);
         if (t.isDaemon()) {
           t.setDaemon(false);
